@@ -1,0 +1,193 @@
+version: "3.9"
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-alpine
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    expose:
+      - "5672/tcp"
+
+  heimdalld:
+    build:
+      context: ./polygon
+      dockerfile: Dockerfile.heimdall
+      args:
+        - DOCKER_TAG=${HEIMDALL_TAG}
+    image: heimdall:local
+    user: root
+    environment:
+      - NETWORK=${NETWORK}
+      - HEIMDALL_SNAPSHOT_FILE=${HEIMDALL_SNAPSHOT_FILE}
+      - HEIMDALL_SEEDS=${HEIMDALL_SEEDS}
+      - HEIMDALL_BOR_RPC_URL=${HEIMDALL_BOR_RPC_URL}
+      - HEIMDALL_ETH_RPC_URL=${HEIMDALL_ETH_RPC_URL}
+    restart: unless-stopped
+    stop_grace_period: 1m
+    depends_on:
+      - rabbitmq
+    entrypoint:
+      - docker-entrypoint.sh
+      - heimdalld
+      - --home
+      - /var/lib/heimdall
+      - start
+    volumes:
+      - heimdall-data:/var/lib/heimdall
+      - /etc/localtime:/etc/localtime:ro
+    expose:
+      - "26657/tcp"
+    ports:
+      - "26656:26656"
+
+  heimdallr:
+    image: heimdall:local
+    restart: unless-stopped
+    stop_grace_period: 1m
+    depends_on:
+      - heimdalld
+    volumes:
+      - heimdall-data:/var/lib/heimdall
+      - /etc/localtime:/etc/localtime:ro
+    expose:
+      - "1317/tcp"
+    user: heimdall
+    entrypoint:
+      - heimdalld
+      - --home
+      - /var/lib/heimdall
+      - rest-server
+      - --chain=${NETWORK}
+      - --laddr=tcp://0.0.0.0:1317
+      - --node=tcp://heimdalld:26657
+
+  prune-bor:
+    profiles: ["tools"]
+    image: bor:local
+    restart: "no"
+    stop_grace_period: 3m
+    user: bor
+    volumes:
+      - bor-data:/var/lib/bor
+      - /etc/localtime:/etc/localtime:ro
+    entrypoint:
+      - bor
+      - --datadir
+      - /var/lib/bor/data
+      - snapshot
+      - prune-state
+
+  bor:
+    image: bor:local
+    build:
+      context: ./polygon
+      dockerfile: ${BOR_DOCKER_FILE}
+      args:
+        - BUILD_TARGET=${BOR_SRC_TAG}
+        - DOCKER_TAG=${BOR_TAG}
+    restart: unless-stopped
+    stop_grace_period: 3m
+    user: root
+    environment:
+      - BOR_DIR=/var/lib/bor
+      - BOR_FULL_NODE_SNAPSHOT_FILE=${BOR_FULL_NODE_SNAPSHOT_FILE}
+    entrypoint:
+      - docker-entrypoint.sh
+      - bor
+      - server
+      - --datadir
+      - /var/lib/bor/data
+      - --cache
+      - ${BOR_CACHE}
+      - --ws
+      - --ws.port
+      - ${BOR_WS_PORT}
+      - --ws.addr
+      - 0.0.0.0
+      - --ws.origins=*
+      - --ws.api
+      - eth,net,web3,txpool,bor
+      - --port
+      - ${BOR_P2P_PORT}
+      - --metrics
+      - --metrics.prometheus-addr
+      - 0.0.0.0:6060
+      - --metrics.expensive
+      - --txpool.locals
+      - ${TX_LOCAL_ADDR}
+      - --txpool.globalslots
+      - "400000"
+      - --rpc.txfeecap
+      - "0"
+      - --txpool.accountslots
+      - "256"
+      - --bor.heimdall
+      - http://heimdallr:1317
+      - --bootnodes
+      - "${BOR_BOOTNODES}"
+      - --txpool.accountqueue
+      - "64"
+      - --txpool.globalqueue
+      - "131072"
+      - --txpool.pricelimit
+      - "30000000000"
+      - --maxpeers
+      - "200"
+      - --http
+      - --http.addr
+      - 0.0.0.0
+      - --http.vhosts=*
+      - --http.api
+      - eth,net,web3,txpool,bor
+      - --http.port
+      - ${BOR_RPC_PORT}
+      - --chain
+      - ${NETWORK}
+      - --log-level
+      - ${LOG_LEVEL}
+      - --ethstats
+      - ${BOR_NODE_ID}:mainnet@bor-mainnet.vitwit.com:3000
+    volumes:
+      - bor-data:/var/lib/bor
+      - /etc/localtime:/etc/localtime:ro
+    expose:
+      - "${BOR_RPC_PORT}/tcp"
+      - "${BOR_WS_PORT}/tcp"
+    ports:
+      - ${BOR_P2P_PORT}:${BOR_P2P_PORT}/tcp
+      - ${BOR_P2P_PORT}:${BOR_P2P_PORT}/udp
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.bor.service=bor
+      - traefik.http.routers.bor.entrypoints=websecure
+      - traefik.http.routers.bor.rule=Host(`${EL_HOST}.${DOMAIN}`)
+      - traefik.http.routers.bor.tls.certresolver=letsencrypt
+      - traefik.http.routers.borlb.service=bor
+      - traefik.http.routers.borlb.entrypoints=websecure
+      - traefik.http.routers.borlb.rule=Host(`${EL_LB}.${DOMAIN}`)
+      - traefik.http.routers.borlb.tls.certresolver=letsencrypt
+      - traefik.http.services.bor.loadbalancer.server.port=${BOR_RPC_PORT}
+      - traefik.http.routers.borws.service=borws
+      - traefik.http.routers.borws.entrypoints=websecure
+      - traefik.http.routers.borws.rule=Host(`${EL_WS_HOST}.${DOMAIN}`)
+      - traefik.http.routers.borws.tls.certresolver=letsencrypt
+      - traefik.http.routers.borwslb.service=borws
+      - traefik.http.routers.borwslb.entrypoints=websecure
+      - traefik.http.routers.borwslb.rule=Host(`${EL_WS_LB}.${DOMAIN}`)
+      - traefik.http.routers.borwslb.tls.certresolver=letsencrypt
+      - traefik.http.services.borws.loadbalancer.server.port=${BOR_WS_PORT}
+
+  set-prune-marker:
+    profiles: ["tools"]
+    image: alpine:latest
+    user: "10001:10001"
+    restart: "no"
+    volumes:
+      - bor-data:/var/lib/bor
+    entrypoint: ["/bin/sh","-c"]
+    command: /bin/sh
+
+volumes:
+  bor-data:
+  heimdall-data:
