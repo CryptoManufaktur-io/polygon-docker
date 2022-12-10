@@ -23,6 +23,7 @@ services:
       - HEIMDALL_SEEDS=${HEIMDALL_SEEDS}
       - HEIMDALL_BOR_RPC_URL=${HEIMDALL_BOR_RPC_URL}
       - HEIMDALL_ETH_RPC_URL=${HEIMDALL_ETH_RPC_URL}
+      - BOR_NODE_ID=${BOR_NODE_ID}
     restart: unless-stopped
     stop_grace_period: 1m
     depends_on:
