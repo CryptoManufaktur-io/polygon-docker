@@ -63,22 +63,6 @@ services:
       - --laddr=tcp://0.0.0.0:1317
       - --node=tcp://heimdalld:26657
 
-  prune-bor:
-    profiles: ["tools"]
-    image: bor:local
-    restart: "no"
-    stop_grace_period: 3m
-    user: bor
-    volumes:
-      - bor-data:/var/lib/bor
-      - /etc/localtime:/etc/localtime:ro
-    entrypoint:
-      - bor
-      - --datadir
-      - /var/lib/bor/data
-      - snapshot
-      - prune-state
-
   bor:
     image: bor:local
     build:
