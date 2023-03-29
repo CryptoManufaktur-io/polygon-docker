@@ -111,8 +111,6 @@ services:
       - "256"
       - --bor.heimdall
       - http://heimdallr:1317
-      - --bootnodes
-      - "${BOR_BOOTNODES}"
       - --txpool.accountqueue
       - "64"
       - --txpool.globalqueue
