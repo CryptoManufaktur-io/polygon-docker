@@ -99,6 +99,8 @@ services:
       - --metrics.prometheus-addr
       - 0.0.0.0:6060
       - --metrics.expensive
+      - --metrics.opencollector-endpoint
+      - ""
       - --txpool.locals
       - ${TX_LOCAL_ADDR}
       - --txpool.globalslots
