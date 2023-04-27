@@ -1,68 +1,6 @@
 version: "3.9"
 
 services:
-  rabbitmq:
-    image: rabbitmq:3-alpine
-    restart: unless-stopped
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
-    expose:
-      - "5672/tcp"
-
-  heimdalld:
-    build:
-      context: ./polygon
-      dockerfile: Dockerfile.heimdall
-      args:
-        - DOCKER_TAG=${HEIMDALL_TAG}
-    image: heimdall:local
-    user: root
-    environment:
-      - NETWORK=${NETWORK}
-      - HEIMDALL_SNAPSHOT_FILE=${HEIMDALL_SNAPSHOT_FILE}
-      - HEIMDALL_SEEDS=${HEIMDALL_SEEDS}
-      - HEIMDALL_BOR_RPC_URL=${HEIMDALL_BOR_RPC_URL}
-      - HEIMDALL_ETH_RPC_URL=${HEIMDALL_ETH_RPC_URL}
-      - BOR_NODE_ID=${BOR_NODE_ID}
-    restart: unless-stopped
-    stop_grace_period: 1m
-    depends_on:
-      - rabbitmq
-    entrypoint:
-      - docker-entrypoint.sh
-      - heimdalld
-      - --home
-      - /var/lib/heimdall
-      - start
-    volumes:
-      - heimdall-data:/var/lib/heimdall
-      - /etc/localtime:/etc/localtime:ro
-    expose:
-      - "26657/tcp"
-    ports:
-      - "26656:26656"
-
-  heimdallr:
-    image: heimdall:local
-    restart: unless-stopped
-    stop_grace_period: 1m
-    depends_on:
-      - heimdalld
-    volumes:
-      - heimdall-data:/var/lib/heimdall
-      - /etc/localtime:/etc/localtime:ro
-    expose:
-      - "1317/tcp"
-    user: heimdall
-    entrypoint:
-      - heimdalld
-      - --home
-      - /var/lib/heimdall
-      - rest-server
-      - --chain=${NETWORK}
-      - --laddr=tcp://0.0.0.0:1317
-      - --node=tcp://heimdalld:26657
-
   bor:
     image: bor:local
     build:
@@ -77,6 +15,7 @@ services:
     environment:
       - BOR_DIR=/var/lib/bor
       - BOR_FULL_NODE_SNAPSHOT_FILE=${BOR_FULL_NODE_SNAPSHOT_FILE}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
     entrypoint:
       - docker-entrypoint.sh
       - bor
@@ -109,8 +48,10 @@ services:
       - "0"
       - --txpool.accountslots
       - "256"
-      - --bor.heimdall
-      - http://heimdallr:1317
+      - --bor.runheimdall
+      - true
+      - --bor.useheimdallapp
+      - true
       - --txpool.accountqueue
       - "64"
       - --txpool.globalqueue
@@ -129,8 +70,6 @@ services:
       - ${BOR_RPC_PORT}
       - --chain
       - ${NETWORK}
-      - --log-level
-      - ${LOG_LEVEL}
       - --ethstats
       - ${BOR_NODE_ID}:mainnet@bor-mainnet.vitwit.com:3000
     volumes:
@@ -175,4 +114,3 @@ services:
 
 volumes:
   bor-data:
-  heimdall-data:
