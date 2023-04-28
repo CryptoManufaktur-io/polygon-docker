@@ -26,7 +26,7 @@ services:
       - cadvisor
 
   node-exporter:
-    image: quay.io/prometheus/node-exporter:latest
+    image: prom/node-exporter:latest
     command:
       - '--path.rootfs=/host'
       - '--path.procfs=/host/proc'

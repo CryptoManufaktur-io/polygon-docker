@@ -43,6 +43,11 @@ services:
       - "26656:26656"
 
   heimdallr:
+    build:
+      context: ./polygon
+      dockerfile: Dockerfile.heimdall
+      args:
+        - DOCKER_TAG=${HEIMDALL_TAG}
     image: heimdall:local
     restart: unless-stopped
     stop_grace_period: 1m
