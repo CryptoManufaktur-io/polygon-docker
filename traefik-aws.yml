@@ -14,12 +14,12 @@ services:
       context: ./traefik
     restart: "unless-stopped"
     command:
-#      - --log.level=DEBUG
 #      - --accesslog=true
 #      - --accesslog.format=json
 #      - --accesslog.fields.defaultmode=keep
 #      - --accesslog.fields.headers.defaultmode=keep
 #      - --certificatesResolvers.letsencrypt.acme.caServer=https://acme-staging-v02.api.letsencrypt.org/directory
+      - --log.level=${LOG_LEVEL:-info}
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
       - --certificatesresolvers.letsencrypt.acme.dnschallenge=true
@@ -32,9 +32,13 @@ services:
       - --entrypoints.websecure.address=:${TRAEFIK_WEB_PORT}
       - --metrics
       - --metrics.prometheus
+    labels:
+      - metrics.scrape=true
+      - metrics.path=/metrics
+      - metrics.port=8080
     ports:
-      - ${HOST_IP:-0.0.0.0}:${TRAEFIK_WEB_PORT}:${TRAEFIK_WEB_PORT}/tcp
-      - ${HOST_IP:-0.0.0.0}:${TRAEFIK_WEB_HTTP_PORT}:${TRAEFIK_WEB_HTTP_PORT}/tcp
+      - ${TRAEFIK_WEB_PORT}:${TRAEFIK_WEB_PORT}/tcp
+      - ${TRAEFIK_WEB_HTTP_PORT}:${TRAEFIK_WEB_HTTP_PORT}/tcp
     environment:
       - AWS_PROFILE=${AWS_PROFILE}
       - AWS_HOSTED_ZONE_ID=${AWS_HOSTED_ZONE_ID}
@@ -44,5 +48,6 @@ services:
       - ~/.aws:/root/.aws:ro
       - /etc/localtime:/etc/localtime:ro
     <<: *logging
+
 volumes:
   certs:
