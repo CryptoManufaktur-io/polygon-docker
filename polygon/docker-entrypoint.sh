@@ -25,6 +25,30 @@ if [ "$(id -u)" = '0' ]; then
    exec su-exec bor "$BASH_SOURCE" "$@"
 fi
 
+# Set verbosity
+shopt -s nocasematch
+case ${LOG_LEVEL} in
+  error)
+    __verbosity="--verbosity 1"
+    ;;
+  warn)
+    __verbosity="--verbosity 2"
+    ;;
+  info)
+    __verbosity="--verbosity 3"
+    ;;
+  debug)
+    __verbosity="--verbosity 4"
+    ;;
+  trace)
+    __verbosity="--verbosity 5"
+    ;;
+  *)
+    echo "LOG_LEVEL ${LOG_LEVEL} not recognized"
+    __verbosity=""
+    ;;
+esac
+
 if [ -f /var/lib/bor/prune-marker ]; then
   rm -f /var/lib/bor/prune-marker
   exec bor snapshot prune-state --datadir /var/lib/bor/data
@@ -41,5 +65,5 @@ else
     cd "${workdir}"
     touch /var/lib/bor/setupdone
   fi
-  exec "$@"
+  exec "$@" ${__verbosity}
 fi

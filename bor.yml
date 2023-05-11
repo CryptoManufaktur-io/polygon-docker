@@ -81,6 +81,7 @@ services:
     environment:
       - NETWORK=${NETWORK}
       - BOR_DIR=/var/lib/bor
+      - LOG_LEVEL=${LOG_LEVEL}
     entrypoint:
       - docker-entrypoint.sh
       - bor
@@ -133,8 +134,6 @@ services:
       - ${BOR_RPC_PORT}
       - --chain
       - ${NETWORK}
-      - --log-level
-      - ${LOG_LEVEL}
       - --ethstats
       - ${BOR_NODE_ID}:${NETWORK}@bor-${NETWORK}.vitwit.com:3000
     volumes:
