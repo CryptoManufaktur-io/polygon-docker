@@ -19,7 +19,6 @@ services:
     user: root
     environment:
       - NETWORK=${NETWORK}
-      - HEIMDALL_SNAPSHOT_FILE=${HEIMDALL_SNAPSHOT_FILE}
       - HEIMDALL_SEEDS=${HEIMDALL_SEEDS}
       - HEIMDALL_BOR_RPC_URL=${HEIMDALL_BOR_RPC_URL}
       - HEIMDALL_ETH_RPC_URL=${HEIMDALL_ETH_RPC_URL}
@@ -80,8 +79,8 @@ services:
     stop_grace_period: 3m
     user: root
     environment:
+      - NETWORK=${NETWORK}
       - BOR_DIR=/var/lib/bor
-      - BOR_FULL_NODE_SNAPSHOT_FILE=${BOR_FULL_NODE_SNAPSHOT_FILE}
     entrypoint:
       - docker-entrypoint.sh
       - bor
@@ -137,7 +136,7 @@ services:
       - --log-level
       - ${LOG_LEVEL}
       - --ethstats
-      - ${BOR_NODE_ID}:mainnet@bor-mainnet.vitwit.com:3000
+      - ${BOR_NODE_ID}:${NETWORK}@bor-${NETWORK}.vitwit.com:3000
     volumes:
       - bor-data:/var/lib/bor
       - /etc/localtime:/etc/localtime:ro

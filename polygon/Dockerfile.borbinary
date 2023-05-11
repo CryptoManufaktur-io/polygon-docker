@@ -8,7 +8,7 @@ ARG BUILD_TARGET
 ARG USER=bor
 ARG UID=10001
 
-RUN apk add --no-cache ca-certificates bash tzdata su-exec
+RUN apk add --no-cache ca-certificates bash tzdata su-exec zstd pv aria2
 
 # See https://stackoverflow.com/a/55757473/12429735RUN
 RUN adduser \
@@ -18,7 +18,7 @@ RUN adduser \
     --uid "${UID}" \
     "${USER}"
 
-RUN mkdir -p /var/lib/bor && chown ${USER}:${USER} /var/lib/bor
+RUN mkdir -p /var/lib/bor/snapshots && chown -R ${USER}:${USER} /var/lib/bor
 COPY ./docker-entrypoint.sh /usr/local/bin/
 
 USER ${USER}

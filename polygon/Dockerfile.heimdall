@@ -2,7 +2,7 @@ ARG DOCKER_TAG
 
 FROM maticnetwork/heimdall:${DOCKER_TAG}
 
-RUN apt-get update && apt-get install -y ca-certificates bash tzdata wget gosu curl
+RUN apt-get update && apt-get install -y ca-certificates bash tzdata gosu curl zstd pv aria2
 
 ARG USER=heimdall
 ARG UID=10000
@@ -15,7 +15,7 @@ RUN adduser \
     --uid "${UID}" \
     "${USER}"
 
-RUN mkdir -p /var/lib/heimdall && chown ${USER}:${USER} /var/lib/heimdall
+RUN mkdir -p /var/lib/heimdall/snapshots && chown -R ${USER}:${USER} /var/lib/heimdall
 
 WORKDIR /var/lib/heimdall
 
