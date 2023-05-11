@@ -19,7 +19,6 @@ services:
     user: root
     environment:
       - NETWORK=${NETWORK}
-      - HEIMDALL_SEEDS=${HEIMDALL_SEEDS}
       - HEIMDALL_BOR_RPC_URL=${HEIMDALL_BOR_RPC_URL}
       - HEIMDALL_ETH_RPC_URL=${HEIMDALL_ETH_RPC_URL}
       - BOR_NODE_ID=${BOR_NODE_ID}
