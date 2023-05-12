@@ -9,6 +9,7 @@ extract_files() {
             continue
         fi
         filename=`echo ${line} | awk -F/ '{print $NF}'`
+        echo "Extracting ${filename}"
         if echo "${filename}" | grep -q "bulk"; then
             pv ${filename} | tar -I zstd -xf - -C ${extract_dir}
         else
