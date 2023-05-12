@@ -27,12 +27,13 @@ fi
 
 if [ ! -f /var/lib/heimdall/setupdone ]; then
   heimdalld init --home /var/lib/heimdall --chain ${NETWORK}
+  mkdir -p /var/lib/heimdall/snapshots
   workdir=$(pwd)
   cd /var/lib/heimdall/snapshots
   # download compiled incremental snapshot files list
-  aria2c -x6 -s6 https://snapshot-download.polygon.technology/heimdall-${NETWORK}-incremental-compiled-files.txt
+  aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true https://snapshot-download.polygon.technology/heimdall-${NETWORK}-incremental-compiled-files.txt
   # download all incremental files, includes automatic checksum verification per increment
-  aria2c -x6 -s6 -i heimdall-${NETWORK}-incremental-compiled-files.txt
+  aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true -i heimdall-${NETWORK}-incremental-compiled-files.txt
   extract_files /var/lib/heimdall heimdall-${NETWORK}-incremental-compiled-files.txt
   cd "${workdir}"
   touch /var/lib/heimdall/setupdone

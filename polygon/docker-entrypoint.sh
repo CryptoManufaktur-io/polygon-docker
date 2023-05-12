@@ -55,12 +55,13 @@ if [ -f /var/lib/bor/prune-marker ]; then
 else
   if [ ! -f /var/lib/bor/setupdone ]; then
     mkdir -p /var/lib/bor/data/bor/chaindata
+    mkdir -p /var/lib/bor/snapshots
     workdir=$(pwd)
     cd /var/lib/bor/snapshots
     # download compiled incremental snapshot files list
-    aria2c -x6 -s6 https://snapshot-download.polygon.technology/bor-${NETWORK}-incremental-compiled-files.txt
+    aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true https://snapshot-download.polygon.technology/bor-${NETWORK}-incremental-compiled-files.txt
     # download all incremental files, includes automatic checksum verification per increment
-    aria2c -x6 -s6 -i bor-${NETWORK}-incremental-compiled-files.txt
+    aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true -i bor-${NETWORK}-incremental-compiled-files.txt
     extract_files /var/lib/bor/data/bor/chaindata bor-${NETWORK}-incremental-compiled-files.txt
     cd "${workdir}"
     touch /var/lib/bor/setupdone
