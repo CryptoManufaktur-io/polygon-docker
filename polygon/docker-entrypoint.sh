@@ -50,6 +50,12 @@ case ${LOG_LEVEL} in
     ;;
 esac
 
+if [ -n "${BOR_BOOTNODES}" ]; then
+    __bootnodes="--bootnodes ${BOR_BOOTNODES}"
+else
+    __bootnodes=""
+fi
+
 if [ -f /var/lib/bor/prune-marker ]; then
   rm -f /var/lib/bor/prune-marker
   exec bor snapshot prune-state --datadir /var/lib/bor/data
@@ -67,5 +73,5 @@ else
     cd "${workdir}"
     touch /var/lib/bor/setupdone
   fi
-  exec "$@" ${__verbosity}
+  exec "$@" ${__verbosity} ${__bootnodes}
 fi
