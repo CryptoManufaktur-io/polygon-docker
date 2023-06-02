@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 extract_files() {
-    extract_dir=$1
+    extract_dir=$1/data
     compiled_files=$2
     while read -r line; do
         if [[ "${line}" == checksum* ]]; then
