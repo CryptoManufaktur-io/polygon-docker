@@ -36,6 +36,27 @@ wget_files() {
     done < ${compiled_files}
 }
 
+split_aria2_list() {
+    compiled_files=$1
+    bulk_file=$2
+    incremental_file=$3
+    
+    rm -f $bulk_file
+    rm -f $incremental_file
+
+    while IFS= read -r line; do
+        if [[ $line == *"bulk"* ]]; then
+            echo "$line" >> $bulk_file
+            IFS= read -r next_line
+            echo "$next_line" >> $bulk_file
+        else
+            echo "$line" >> $incremental_file
+            IFS= read -r next_line
+            echo "$next_line" >> $incremental_file
+        fi
+    done < ${compiled_files}
+}
+
 # allow the container to be started with `--user`
 # If started as root, chown the `--datadir` and run bor as bor
 if [ "$(id -u)" = '0' ]; then
@@ -84,12 +105,20 @@ else
     cd /var/lib/bor/snapshots
     # download compiled incremental snapshot files list
     aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true https://snapshot-download.polygon.technology/bor-${NETWORK}-incremental-compiled-files.txt
+    split_aria2_list bor-${NETWORK}-incremental-compiled-files.txt bor-bulk-file.txt bor-incremental-files.txt
     if [ "${USE_ARIA}" = "true" ]; then
+        # download bulk file, includes automatic checksum verification per increment
+        aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true -i bor-bulk-file.txt
+        extract_files /var/lib/bor/data/bor/chaindata bor-bulk-file.txt
         # download all incremental files, includes automatic checksum verification per increment
-        aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true -i bor-${NETWORK}-incremental-compiled-files.txt
-        extract_files /var/lib/bor/data/bor/chaindata bor-${NETWORK}-incremental-compiled-files.txt
+        aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true -i bor-incremental-files.txt
+        extract_files /var/lib/bor/data/bor/chaindata bor-incremental-files.txt
     else
-        wget_files /var/lib/bor/data/bor/chaindata bor-${NETWORK}-incremental-compiled-files.txt
+        if [ ! -f /var/lib/bor/bulkdone ]; then
+            wget_files /var/lib/bor/data/bor/chaindata bor-bulk-file.txt
+            touch /var/lib/bor/bulkdone
+        fi
+        wget_files /var/lib/bor/data/bor/chaindata bor-incremental-files.txt
     fi
     cd "${workdir}"
     touch /var/lib/bor/setupdone
