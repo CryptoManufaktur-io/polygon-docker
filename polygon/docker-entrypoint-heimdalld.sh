@@ -48,7 +48,6 @@ sed -i '/26657/c\laddr = "tcp://0.0.0.0:26657"' /var/lib/heimdall/config/config.
 sed -i "/moniker/c\moniker = \"${BOR_NODE_ID:-upbeatCucumber}\"" /var/lib/heimdall/config/config.toml
 sed -i "/bor_rpc_url/c\bor_rpc_url = \"${HEIMDALL_BOR_RPC_URL}\"" /var/lib/heimdall/config/heimdall-config.toml
 sed -i "/eth_rpc_url/c\eth_rpc_url = \"${HEIMDALL_ETH_RPC_URL}\"" /var/lib/heimdall/config/heimdall-config.toml
-sed -i '/amqp_url/c\amqp_url = "amqp://guest:guest@rabbitmq:5672"' /var/lib/heimdall/config/heimdall-config.toml
 sed -i '/max_num_inbound_peers/c\max_num_inbound_peers = "300"' /var/lib/heimdall/config/heimdall-config.toml
 sed -i '/max_num_outbound_peers/c\max_num_outbound_peers = "100"' /var/lib/heimdall/config/heimdall-config.toml
 exec "$@"

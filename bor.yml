@@ -1,14 +1,6 @@
 version: "3.9"
 
 services:
-  rabbitmq:
-    image: rabbitmq:3-alpine
-    restart: unless-stopped
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
-    expose:
-      - "5672/tcp"
-
   heimdalld:
     build:
       context: ./polygon
@@ -32,40 +24,15 @@ services:
       - heimdalld
       - --home
       - /var/lib/heimdall
+      - --chain
+      - ${NETWORK}
+      - --rest-server
       - start
     volumes:
       - heimdall-data:/var/lib/heimdall
       - /etc/localtime:/etc/localtime:ro
-    expose:
-      - "26657/tcp"
     ports:
       - "26656:26656"
-
-  heimdallr:
-    build:
-      context: ./polygon
-      dockerfile: Dockerfile.heimdall
-      args:
-        - DOCKER_TAG=${HEIMDALL_TAG}
-    image: heimdall:local
-    restart: unless-stopped
-    stop_grace_period: 1m
-    depends_on:
-      - heimdalld
-    volumes:
-      - heimdall-data:/var/lib/heimdall
-      - /etc/localtime:/etc/localtime:ro
-    expose:
-      - "1317/tcp"
-    user: heimdall
-    entrypoint:
-      - heimdalld
-      - --home
-      - /var/lib/heimdall
-      - rest-server
-      - --chain=${NETWORK}
-      - --laddr=tcp://0.0.0.0:1317
-      - --node=tcp://heimdalld:26657
 
   bor:
     image: bor:local
@@ -117,7 +84,7 @@ services:
       - --txpool.accountslots
       - "256"
       - --bor.heimdall
-      - http://heimdallr:1317
+      - http://heimdalld:1317
       - --txpool.accountqueue
       - "64"
       - --txpool.globalqueue
