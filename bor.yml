@@ -56,8 +56,8 @@ services:
       - server
       - --datadir
       - /var/lib/bor/data
-      - --config
-      - /var/lib/bor/config.toml
+#      - --config
+#      - /var/lib/bor/config.toml
       - --cache
       - ${BOR_CACHE}
       - --ws
