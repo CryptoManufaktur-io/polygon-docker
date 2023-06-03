@@ -83,6 +83,7 @@ services:
       - BOR_DIR=/var/lib/bor
       - BOR_BOOTNODES=${BOR_BOOTNODES}
       - LOG_LEVEL=${LOG_LEVEL}
+      - USE_ARIA=${USE_ARIA}
     entrypoint:
       - docker-entrypoint.sh
       - bor
