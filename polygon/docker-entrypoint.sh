@@ -29,9 +29,9 @@ wget_files() {
         filename="${line}"
         echo "Extracting ${filename}"
         if echo "${filename}" | grep -q "bulk"; then
-            wget ${filename} | zstdcat - | tar -xf - -C ${extract_dir}
+            wget -O - ${filename} | zstdcat - | tar -xf - -C ${extract_dir}
         else
-            wget ${filename} | zstdcat - | tar -xf - -C ${extract_dir} --strip-components=3
+            wget -O - ${filename} | zstdcat - | tar -xf - -C ${extract_dir} --strip-components=3
         fi
     done < ${compiled_files}
 }
