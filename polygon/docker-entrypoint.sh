@@ -94,6 +94,14 @@ else
     __bootnodes=""
 fi
 
+# Create a config.toml with trusted nodes
+cat << EOF >/var/lib/bor/config.toml
+[p2p]
+    [p2p.discovery]
+        static-nodes = [${BOR_TRUSTED_NODES}]
+        trusted-nodes = [${BOR_TRUSTED_NODES}]
+EOF
+
 if [ -f /var/lib/bor/prune-marker ]; then
   rm -f /var/lib/bor/prune-marker
   exec bor snapshot prune-state --datadir /var/lib/bor/data

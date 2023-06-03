@@ -49,12 +49,15 @@ services:
       - BOR_BOOTNODES=${BOR_BOOTNODES}
       - LOG_LEVEL=${LOG_LEVEL}
       - USE_ARIA=${USE_ARIA}
+      - BOR_TRUSTED_NODES=${BOR_TRUSTED_NODES}
     entrypoint:
       - docker-entrypoint.sh
       - bor
       - server
       - --datadir
       - /var/lib/bor/data
+      - --config
+      - /var/lib/bor/config.toml
       - --cache
       - ${BOR_CACHE}
       - --ws
