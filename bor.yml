@@ -20,12 +20,12 @@ services:
     entrypoint:
       - docker-entrypoint.sh
       - heimdalld
+      - start
       - --home
       - /var/lib/heimdall
       - --chain
       - ${NETWORK}
       - --rest-server
-      - start
     volumes:
       - heimdall-data:/var/lib/heimdall
       - /etc/localtime:/etc/localtime:ro
