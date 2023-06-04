@@ -118,15 +118,16 @@ else
         # download bulk file, includes automatic checksum verification per increment
         aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true -i bor-bulk-file.txt
         extract_files /var/lib/bor/data/bor/chaindata bor-bulk-file.txt
+        # download all incremental files, includes automatic checksum verification per increment
+        aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true -i bor-incremental-files.txt
+        extract_files /var/lib/bor/data/bor/chaindata bor-incremental-files.txt
     else
         if [ ! -f /var/lib/bor/bulkdone ]; then
             wget_files /var/lib/bor/data/bor/chaindata bor-bulk-file.txt
             touch /var/lib/bor/bulkdone
         fi
+        wget_files /var/lib/bor/data/bor/chaindata bor-incremental-files.txt
     fi
-    # download all incremental files, includes automatic checksum verification per increment
-    aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true -i bor-incremental-files.txt
-    extract_files /var/lib/bor/data/bor/chaindata bor-incremental-files.txt
     cd "${workdir}"
     touch /var/lib/bor/setupdone
   fi
