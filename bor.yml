@@ -8,7 +8,6 @@ services:
       args:
         - DOCKER_TAG=${HEIMDALL_TAG}
     image: heimdall:local
-    tty: true
     user: root
     environment:
       - NETWORK=${NETWORK}
@@ -35,7 +34,6 @@ services:
 
   bor:
     image: bor:local
-    tty: true
     build:
       context: ./polygon
       dockerfile: ${BOR_DOCKER_FILE}
