@@ -1,5 +1,5 @@
-#!/bin/bash
-set -Eeuo pipefail
+#!/usr/bin/env bash
+#set -Eeuo pipefail
 
 extract_files() {
     extract_dir=$1
@@ -124,17 +124,21 @@ else
         # download all incremental files, includes automatic checksum verification per increment
         # Be space-saving and do this one by one
         i=0
+        >bor-current-incremental.txt
         while IFS= read -r line; do
             # Every two lines, pass the temp file to aria2c
             if (( i % 2 == 0 )) && (( i != 0 )); then
                 aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true -i bor-current-incremental.txt
                 extract_files /var/lib/bor/data/bor/chaindata bor-current-incremental.txt
-                > bor-current-incremental.txt
+                >bor-current-incremental.txt
             fi
             # Write the current line to the temp file
             echo "$line" >> bor-current-incremental.txt
             ((i++))
         done < bor-incremental-files.txt
+        # Get the final file
+        aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true -i bor-current-incremental.txt
+        extract_files /var/lib/bor/data/bor/chaindata bor-current-incremental.txt
     else
         if [ ! -f /var/lib/bor/bulkdone ]; then
             wget_files /var/lib/bor/data/bor/chaindata bor-bulk-file.txt

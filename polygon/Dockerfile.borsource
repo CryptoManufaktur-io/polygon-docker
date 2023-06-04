@@ -17,7 +17,7 @@ FROM alpine:latest
 ARG USER=bor
 ARG UID=10001
 
-RUN apk add --no-cache ca-certificates bash tzdata su-exec zstd pv aria2
+RUN apk add --no-cache ca-certificates bash tzdata su-exec zstd pv aria2 coreutils
 
 # See https://stackoverflow.com/a/55757473/12429735RUN
 RUN adduser \
