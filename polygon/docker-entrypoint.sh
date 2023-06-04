@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#set -Eeuo pipefail
+set -uo pipefail
 
 extract_files() {
     extract_dir=$1
@@ -125,7 +125,7 @@ else
         # Be space-saving and do this one by one
         i=0
         >bor-current-incremental.txt
-        while IFS= read -r line; do
+        while IFS= read -r entry; do
             # Every two lines, pass the temp file to aria2c
             if (( i % 2 == 0 )) && (( i != 0 )); then
                 aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true -i bor-current-incremental.txt
@@ -133,7 +133,7 @@ else
                 >bor-current-incremental.txt
             fi
             # Write the current line to the temp file
-            echo "$line" >> bor-current-incremental.txt
+            echo "$entry" >> bor-current-incremental.txt
             ((i++))
         done < bor-incremental-files.txt
         # Get the final file
