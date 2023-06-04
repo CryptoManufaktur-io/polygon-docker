@@ -115,9 +115,12 @@ else
     aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true https://snapshot-download.polygon.technology/bor-${NETWORK}-incremental-compiled-files.txt
     split_aria2_list bor-${NETWORK}-incremental-compiled-files.txt bor-bulk-file.txt bor-incremental-files.txt
     if [ "${USE_ARIA}" = "true" ]; then
-        # download bulk file, includes automatic checksum verification per increment
-        aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true -i bor-bulk-file.txt
-        extract_files /var/lib/bor/data/bor/chaindata bor-bulk-file.txt
+        if [ ! -f /var/lib/bor/bulkdone ]; then
+            # download bulk file, includes automatic checksum verification per increment
+            aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true -i bor-bulk-file.txt
+            extract_files /var/lib/bor/data/bor/chaindata bor-bulk-file.txt
+            touch /var/lib/bor/bulkdone
+        fi
         # download all incremental files, includes automatic checksum verification per increment
         aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true -i bor-incremental-files.txt
         extract_files /var/lib/bor/data/bor/chaindata bor-incremental-files.txt
