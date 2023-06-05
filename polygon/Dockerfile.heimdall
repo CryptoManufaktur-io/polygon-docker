@@ -2,7 +2,7 @@ ARG DOCKER_TAG
 
 FROM maticnetwork/heimdall:${DOCKER_TAG}
 
-RUN apt-get update && apt-get install -y ca-certificates bash tzdata gosu curl zstd pv aria2
+RUN apt-get update && apt-get install -y ca-certificates bash tzdata gosu curl zstd pv aria2 coreutils
 
 ARG USER=heimdall
 ARG UID=10000

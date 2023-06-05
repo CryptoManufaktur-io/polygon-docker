@@ -11,9 +11,9 @@ extract_files() {
         filename=`echo ${line} | awk -F/ '{print $NF}'`
         echo "Extracting ${filename}"
         if echo "${filename}" | grep -q "bulk"; then
-            pv -f ${filename} | zstdcat - | tar -xf - -C ${extract_dir}
+            pv -f -p ${filename} | zstdcat - | tar -xf - -C ${extract_dir} 2>&1 | stdbuf -o0 tr '\r' '\n'
         else
-            pv -f ${filename} | zstdcat - | tar -xf - -C ${extract_dir} --strip-components=3
+            pv -f -p ${filename} | zstdcat - | tar -xf - -C ${extract_dir} --strip-components=3 2>&1 | stdbuf -o0 tr '\r' '\n'
         fi
         rm -f ${filename}
     done < ${compiled_files}
