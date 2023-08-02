@@ -144,7 +144,7 @@ else
   bor dumpconfig "$@" ${__verbosity} ${__bootnodes} >/var/lib/bor/config.toml
   # Set user-supplied trusted nodes
   if [ -n "${TRUSTED_NODES}" ]; then
-    for string in $(jq -r .[] <<< "${STATIC_NODES}"); do
+    for string in $(jq -r .[] <<< "${TRUSTED_NODES}"); do
       dasel put -v $(echo $string) -f /var/lib/bor/config.toml 'p2p.discovery.trusted-nodes.[]'
     done
   fi
