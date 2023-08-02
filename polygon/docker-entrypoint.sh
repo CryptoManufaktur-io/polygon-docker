@@ -94,14 +94,6 @@ else
     __bootnodes=""
 fi
 
-# Create a config.toml with trusted nodes
-cat << EOF >/var/lib/bor/config.toml
-[p2p]
-    [p2p.discovery]
-        static-nodes = [${BOR_TRUSTED_NODES}]
-        trusted-nodes = [${BOR_TRUSTED_NODES}]
-EOF
-
 if [ -f /var/lib/bor/prune-marker ]; then
   rm -f /var/lib/bor/prune-marker
   exec bor snapshot prune-state --datadir /var/lib/bor/data
@@ -149,5 +141,13 @@ else
     cd "${workdir}"
     touch /var/lib/bor/setupdone
   fi
-  exec "$@" ${__verbosity} ${__bootnodes}
+  bor dumpconfig "$@" ${__verbosity} ${__bootnodes} >/var/lib/bor/config.toml
+  # Set user-supplied static nodes, and also as trusted nodes
+  if [ -n "${STATIC_NODES}" ]; then
+    for string in $(jq -r .[] <<< "${STATIC_NODES}"); do
+      dasel put -v $(echo $string) -f /var/lib/bor/config.toml 'p2p.discovery.static-nodes.[]'
+      dasel put -v $(echo $string) -f /var/lib/bor/config.toml 'p2p.discovery.trusted-nodes.[]'
+    done
+  fi
+  exec bor server --config /var/lib/bor/config.toml
 fi
