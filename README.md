@@ -25,4 +25,4 @@ If heimdalld cannot find peers after half an hour or, a workaround is to take a 
 
 # Version
 
-This is polygon-docker v1.1
+This is polygon-docker v1.1.1
