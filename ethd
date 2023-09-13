@@ -563,7 +563,7 @@ version() {
     case "${value}" in
         *bor.yml* )
             echo "Heimdall"
-            docompose exec heimdalld version
+            docompose exec heimdalld heimdalld version
             echo
             echo "Bor"
             docompose exec bor bor version
