@@ -1,5 +1,4 @@
 # To be used in conjunction with bor.yml
-version: "3.9"
 services:
   bor:
     ports:

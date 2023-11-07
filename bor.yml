@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   heimdalld:
     build:
@@ -8,6 +6,7 @@ services:
       args:
         - DOCKER_TAG=${HEIMDALL_TAG}
     image: heimdall:local
+    pull_policy: build
 #    tty: true
     user: root
     environment:
@@ -35,6 +34,7 @@ services:
 
   bor:
     image: bor:local
+    pull_policy: build
     build:
       context: ./polygon
       dockerfile: ${BOR_DOCKER_FILE}

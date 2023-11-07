@@ -7,7 +7,6 @@
 # common use case. It properly is a Prometheus without Grafana and the ability to add custom
 # content to prometheus.yml
 
-version: "3.9"
 x-logging: &logging
   logging:
     driver: json-file
@@ -22,6 +21,7 @@ services:
     build:
       context: ./prometheus
     image: prometheus:local
+    pull_policy: build
     volumes:
       - prom-data:/prometheus
       - ./prometheus/custom-prom.yml:/etc/prometheus/custom-prom.yml:ro
