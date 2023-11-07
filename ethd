@@ -10,12 +10,14 @@ __compose_upgraded=0
 
 
 dodocker() {
-    $__docker_exe "$@"
+    $__docker_sudo $__docker_exe "$@"
 }
 
 
 docompose() {
-    $__compose_exe "$@"
+# I want word splitting here
+# shellcheck disable=SC2086
+    $__docker_sudo $__compose_exe "$@"
 }
 
 
@@ -39,10 +41,22 @@ determine_distro() {
     [ "$__distro" == "" ] && __distro=$__uname
     unset __uname
     __distro=$(echo "$__distro" | tr "[:upper:]" "[:lower:]")
+
+    if [[ "$__distro" = "ubuntu" ]]; then
+      if ! dpkg-query -W -f='${Status}' lsb-release 2>/dev/null | grep -q "ok installed"; then
+        ${__auto_sudo} apt-get update && ${__auto_sudo} apt-get -y install lsb-release
+      fi
+      __os_major_version=$(lsb_release -r | cut -d: -f2 | sed s/'^\t'// | cut -d. -f1)
+    elif [[ "$__distro" =~ "debian" ]]; then
+      if ! dpkg-query -W -f='${Status}' lsb-release 2>/dev/null | grep -q "ok installed"; then
+        ${__auto_sudo} apt-get update && ${__auto_sudo} apt-get -y install lsb-release
+      fi
+      __os_major_version=$(lsb_release -r | cut -f2)
+    fi
 }
 
 
-determine_sudo() {
+handle_docker_sudo() {
     if [[ "$__distro" =~ "debian" || "$__distro" = "ubuntu" ]]; then
         systemctl status docker >/dev/null
         result=$?
@@ -54,33 +68,37 @@ determine_sudo() {
         fi
     fi
 
-    __maybe_sudo=""
+    __docker_sudo=""
     if ! docker images >/dev/null 2>&1; then
         echo "Will use sudo to access Docker"
-        __maybe_sudo="sudo"
+        __docker_sudo="sudo"
     fi
 }
 
 
-determine_docker() {
-    if [ -n "$__maybe_sudo" ]; then
-        __docker_exe="sudo $__docker_exe"
+handle_root() {
+    if [ "${EUID}" -eq 0 ]; then
+        __as_owner="sudo -u ${OWNER}"
+        __auto_sudo=""
+    else
+        __as_owner=""
+        __auto_sudo="sudo"
     fi
 }
 
 
-determine_compose() {
+check_compose_version() {
 # Check for Compose V2 (docker compose) vs Compose V1 (docker-compose)
   if docker compose version >/dev/null 2>&1; then
     __old_compose=0
   else
     __old_compose=1
-    __compose_version=$($__maybe_sudo docker-compose --version | sed -n -E -e "s/.*version [v]?([0-9.-]*).*/\1/ip")
+    __compose_version=$($__docker_sudo docker-compose --version | sed -n -E -e "s/.*version [v]?([0-9.-]*).*/\1/ip")
     if [ -n "${ETHDSECUNDO-}" ]  || [ ! "${__command}" = "update" ]; then # Don't run this twice
       echo
       echo "You are using docker-compose ${__compose_version}, which is unsupported by Docker, Inc."
       echo "${__project_name} only supports Compose V2."
-      echo ""
+      echo
       echo "It is recommended that you replace Compose V1 with Compose V2."
       while true; do
         read -rp "Do you want to update Docker Compose to V2? (yes/no) " yn
@@ -90,10 +108,6 @@ determine_compose() {
         esac
       done
     fi
-  fi
-
-  if [ -n "$__maybe_sudo" ]; then
-    __compose_exe="sudo $__compose_exe"
   fi
 }
 
@@ -105,10 +119,8 @@ upgrade_compose() {
   fi
   echo "Updating Docker Compose to V2"
   if [[ "$__distro" = "ubuntu" ]]; then
-    ${__auto_sudo} apt-get update && ${__auto_sudo} apt-get install -y lsb-release
-    __major_version=$(lsb_release -r | cut -d: -f2 | sed s/'^\t'// | cut -d. -f1)
-    if [ "${__major_version}" -lt 20 ]; then
-      echo "This script cannot update Docker Compose on Ubuntu ${__major_version}."
+    if [ "${__os_major_version}" -lt 20 ]; then
+      echo "${__project_name} cannot update Docker Compose on Ubuntu ${__os_major_version}."
       echo "Consider upgrading to 20.04 and then 22.04."
       exit 1
     fi
@@ -125,10 +137,9 @@ upgrade_compose() {
     __old_compose=0
     __compose_upgraded=1
   elif [[ "$__distro" =~ "debian" ]]; then
-    ${__auto_sudo} apt-get update && ${__auto_sudo} apt-get -y install ca-certificates curl gnupg lsb-release
-    __major_version=$(lsb_release -r | cut -f2)
-    if [ "${__major_version}" -lt 10 ]; then
-        echo "This script cannot update Docker Compose on Debian ${__major_version}."
+    ${__auto_sudo} apt-get update && ${__auto_sudo} apt-get -y install ca-certificates curl gnupg
+    if [ "${__os_major_version}" -lt 10 ]; then
+        echo "${__project_name} cannot update Docker Compose on Debian ${__os_major_version}."
         echo "Consider upgrading to 10, then 11 and then 12."
         exit 1
     fi
@@ -150,19 +161,8 @@ upgrade_compose() {
     __old_compose=0
     __compose_upgraded=1
   else
-    echo "This script does not know how to update Docker Compose on $__distro"
+    echo "${__project_name} does not know how to update Docker Compose on $__distro"
   fi
-}
-
-
-handle_root() {
-    if [ "${EUID}" -eq 0 ]; then
-        __as_owner="sudo -u ${OWNER}"
-        __auto_sudo=""
-    else
-        __as_owner=""
-        __auto_sudo="sudo"
-    fi
 }
 
 
@@ -196,14 +196,13 @@ install() {
         esac
     done
     if [[ "$__distro" = "ubuntu" ]]; then
-        __major_version=$(lsb_release -r | cut -d: -f2 | sed s/'^\t'// | cut -d. -f1)
-        if [ "${__major_version}" -lt 20 ]; then
-            echo "${__project_name} cannot install Docker on Ubuntu ${__major_version}."
+        if [ "${__os_major_version}" -lt 20 ]; then
+            echo "${__project_name} cannot install Docker on Ubuntu ${__os_major_version}."
             echo "Consider upgrading to 20.04 and then 22.04."
             exit 1
         fi
         if [ -z "$(which docker)" ]; then
-            ${__auto_sudo} apt-get update && ${__auto_sudo} apt-get install -y ca-certificates curl gnupg lsb-release \
+            ${__auto_sudo} apt-get update && ${__auto_sudo} apt-get install -y ca-certificates curl gnupg \
                 chrony pkg-config
             ${__auto_sudo} mkdir -p /etc/apt/keyrings
             ${__auto_sudo} curl -fsSL https://download.docker.com/linux/ubuntu/gpg | ${__auto_sudo} gpg --dearmor -o /etc/apt/keyrings/docker.gpg
@@ -228,10 +227,9 @@ install() {
     elif [[ "$__distro" =~ "debian" ]]; then
         if [ -z "$(which docker)" ]; then
             ${__auto_sudo} apt-get update
-            ${__auto_sudo} apt-get -y install ca-certificates curl gnupg lsb-release chrony pkg-config
-            __major_version=$(lsb_release -r | cut -f2)
-            if [ "${__major_version}" -lt 10 ]; then
-                echo "${__project_name} cannot install Docker on Debian ${__major_version}."
+            ${__auto_sudo} apt-get -y install ca-certificates curl gnupg chrony pkg-config
+            if [ "${__os_major_version}" -lt 10 ]; then
+                echo "${__project_name} cannot install Docker on Debian ${__os_major_version}."
                 echo "Consider upgrading to 10, then 11 and then 12."
                 exit 1
             fi
@@ -275,6 +273,7 @@ check_disk_space() {
         exit 70
     fi
 
+# Adjust if your clients prune manually
 # Literal match intended
 # shellcheck disable=SC2076
     if [[ "${__free_space}" -lt 52428800 ]]; then
@@ -289,19 +288,17 @@ check_disk_space() {
 
 nag_os_version() {
     if [[ "$__distro" = "ubuntu" ]]; then
-      __major_version=$(lsb_release -r | cut -d: -f2 | sed s/'^\t'// | cut -d. -f1)
-      if [ "${__major_version}" -lt 20 ]; then
+      if [ "${__os_major_version}" -lt 20 ]; then
          echo
-         echo "Ubuntu ${__major_version} is older than the recommended 22.04 or 20.04 version."
+         echo "Ubuntu ${__os_major_version} is older than the recommended 22.04 or 20.04 version."
          echo
       fi
     fi
 
     if [[ "$__distro" =~ "debian" ]]; then
-      __major_version=$(lsb_release -r | cut -f2)
-      if [ "${__major_version}" -lt 10 ]; then
+      if [ "${__os_major_version}" -lt 10 ]; then
          echo
-         echo "Debian ${__major_version} is older than the recommended 10, 11 or 12 version."
+         echo "Debian ${__os_major_version} is older than the recommended 10, 11 or 12 version."
          echo
       fi
     fi
@@ -379,7 +376,7 @@ find the original contents in ${ENV_FILE}.bak."
     fi
 
     echo
-    echo "An $__me up command will start using the new images and configuration."
+    echo "A $__me up command will start using the new images and configuration."
     nag_os_version
 
     unset ETHDSECUNDO
@@ -403,6 +400,7 @@ envmigrate() {
         return
     fi
 
+# Adjust these vars to your project
     ALL_VARS=( COMPOSE_FILE NETWORK SNAPSHOT LOG_LEVEL DOMAIN RPC_HOST RPC_LB WS_HOST WS_LB RPC_PORT WS_PORT P2P_PORT \
                X_SRC_BUILD_TARGET X_SRC_REPO X_DOCKER_TAG X_DOCKER_REPO X_DOCKERFILE )
     OLD_VARS=( )
@@ -424,6 +422,7 @@ envmigrate() {
     # Migrate over user settings
     for var in "${ALL_VARS[@]}"; do
         value=$(sed -n -e "s/^${var}=\(.*\)/\1/p" "${ENV_FILE}.source" || true)
+# Adjust for vars that are possibly empty
         if [ -n "${value}" ] || [ "${var}" = "SNAPSHOT" ]; then
             sed -i'.original' -e "s~^\(${var}\s*=\s*\).*$~\1${value}~" "${ENV_FILE}"
         fi
@@ -508,9 +507,9 @@ terminate() {
 # In this case I want the word splitting, so rm can remove all volumes
 # shellcheck disable=SC2046
     dodocker volume rm $(dodocker volume ls -q -f "name=^$(basename "$(realpath .)")_[^_]+")
-    echo ""
+    echo
     echo "All containers stopped and all volumes deleted"
-    echo ""
+    echo
 }
 
 
@@ -555,10 +554,11 @@ handle_error() {
 version() {
     # script version
     grep "^This is" README.md
-    echo ""
+    echo
     var="COMPOSE_FILE"
     value=$(sed -n -e "s/^${var}=\(.*\)/\1/p" "${ENV_FILE}" || true)
     # Client versions
+# Adjust for your clients and how to check their version
     case "${value}" in
         *x.yml* )
             docompose exec x-geth x-geth version
@@ -639,17 +639,16 @@ __command="$1"
 shift
 __params=$*
 
-determine_distro
 handle_root
+determine_distro
 
 if [ "$__command" = "install" ]; then
     $__command "$@"
     exit "$?"
 fi
 
-determine_sudo
-determine_docker
-determine_compose
+handle_docker_sudo
+check_compose_version
 
 if [ "${__old_compose}" -eq 1 ]; then
   echo
@@ -663,12 +662,12 @@ if [ "${__old_compose}" -eq 1 ]; then
 fi
 
 if ! dodocker images >/dev/null 2>&1; then
-    echo "Please ensure you can call $__docker_exe before running this script."
+    echo "Please ensure you can call $__docker_exe before running ${__me}."
     exit 1
 fi
 
 if ! docompose --help >/dev/null 2>&1; then
-    echo "Please ensure you can call $__compose_exe before running this script"
+    echo "Please ensure you can call $__compose_exe before running ${__me}."
     exit 1
 fi
 
