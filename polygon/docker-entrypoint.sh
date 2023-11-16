@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -uo pipefail
+set -euo pipefail
 
 extract_files() {
     extract_dir=$1
@@ -141,7 +141,7 @@ else
     cd "${workdir}"
     touch /var/lib/bor/setupdone
   fi
-  bor dumpconfig "$@" ${__verbosity} ${__bootnodes} >/var/lib/bor/config.toml
+  bor dumpconfig "$@" ${__verbosity} ${__bootnodes} ${EXTRAS} >/var/lib/bor/config.toml
   # Set user-supplied trusted nodes, also as static
   if [ -n "${TRUSTED_NODES}" ]; then
     for string in $(jq -r .[] <<< "${TRUSTED_NODES}"); do

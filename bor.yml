@@ -48,13 +48,12 @@ services:
       - NETWORK=${NETWORK}
       - BOR_DIR=/var/lib/bor
       - BOR_BOOTNODES=${BOR_BOOTNODES}
-      - LOG_LEVEL=${LOG_LEVEL}
-      - USE_ARIA=${USE_ARIA}
-      - TRUSTED_NODES=${BOR_TRUSTED_NODES}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - USE_ARIA=${USE_ARIA:-true}
+      - TRUSTED_NODES=${BOR_TRUSTED_NODES:-}
+      - EXTRAS=${BOR_EXTRAS:-}
     entrypoint:
       - docker-entrypoint.sh
-#      - bor
-#      - server
       - --datadir
       - /var/lib/bor/data
       - --cache
