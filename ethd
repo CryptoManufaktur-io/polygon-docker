@@ -450,12 +450,12 @@ start() {
 
 
 up() {
-  start
+  start "$@"
 }
 
 
 run() {
-  start
+  start "$@"
 }
 
 
@@ -574,9 +574,9 @@ help() {
   echo "    attempts to install Docker and Docker Compose for you"
   echo "  update "
   echo "    updates all client versions and ${__project_name} itself"
-  echo "  up|start"
+  echo "  up|start [service-name]"
   echo "    starts the ${__app_name}, or restarts containers that had their image or"
-  echo "    configuration changed"
+  echo "    configuration changed. Can also start a specific service by name"
   echo "  down|stop [service-name]"
   echo "    stops the ${__app_name}, or a specific service by name"
   echo "  restart [service-name]"
@@ -592,12 +592,10 @@ help() {
   echo "  help"
   echo "    print this help screen"
   echo
-  echo
   echo "The logs command can be appended by flags and specify the container(s). example: "
   echo
   echo "  $__me logs -f --tail 50 ${__sample_service}"
   echo "    shows logs only for ${__sample_service} service"
-  echo
   echo
   echo "$__me will attempt to use sudo as needed for Docker commands"
   echo
