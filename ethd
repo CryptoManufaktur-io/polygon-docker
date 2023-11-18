@@ -278,7 +278,7 @@ check_disk_space() {
   if [[ "${__free_space}" -lt 52428800 ]]; then
     echo
     echo "You have less than 50 GiB of free disk space:"
-    echo 
+    echo
     df -h "${__docker_dir}"
     echo
   fi
@@ -343,9 +343,22 @@ update() {
 
   if [ -z "${ETHDSECUNDO-}" ]; then
     # Do not track changes to ext-network.yml
+    set +e
     ${__as_owner} git update-index --assume-unchanged ext-network.yml
     ${__as_owner} git config pull.rebase false
-    ${__as_owner} git pull
+    var="SCRIPT_TAG"
+    value=$(sed -n -e "s/^${var}=\(.*\)/\1/p" "${ENV_FILE}" || true)
+    if [ -z "${value}" ] || [ "${value}" = "latest" ]; then
+      export ETHDPINNED=""
+      ${__as_owner} git checkout main
+      ${__as_owner} git pull
+    else
+      export ETHDPINNED="${value}"
+      ${__as_owner} git fetch --tags
+      ${__as_owner} git checkout -B "tag-${value}" "tags/${value}"
+    fi
+    export GITEXITCODE=$?
+    set -e
     # BASH_SOURCE so newer code gets to do the update. Use an ENV var
     # to avoid infinite loop
     export ETHDSECUNDO=1
@@ -373,12 +386,23 @@ find the original contents in ${ENV_FILE}.bak."
       ${__as_owner} rm "${ENV_FILE}".source || true
     fi
   fi
-
   echo
-  echo "A $__me up command will start using the new images and configuration."
+  if [ -z "${GITEXITCODE+x}" ] || [ "${GITEXITCODE}" -eq 0 ]; then
+    echo "A \"$__me up\" command will start using the new images and configuration."
+  else
+    echo "WARNING"
+    echo
+    echo "Updating ${__project_name} failed during \"git pull\""
+    echo
+    echo "Please try \"git pull\" manually."
+    echo "Do not run \"$__me up\" until git can update ${__project_name}."
+    echo "The current partial update risks startup failure."
+  fi
+
   nag_os_version
 
   unset ETHDSECUNDO
+  unset GITEXITCODE
   check_for_snap
   if [ "${__dirty}" -eq 1 ]; then
     echo
@@ -389,6 +413,10 @@ find the original contents in ${ENV_FILE}.bak."
     echo "These are the files with local changes:"
     echo
     ${__as_owner} git status --porcelain
+  fi
+  if [ -n "${ETHDPINNED:-}" ]; then
+    echo "${__project_name} version is pinned to ${ETHDPINNED} in \".env\"."
+    echo "Please make sure to run compatible client versions."
   fi
   __during_update=0
 }
@@ -401,7 +429,7 @@ envmigrate() {
 
 # Adjust these vars to your project
   ALL_VARS=( COMPOSE_FILE NETWORK SNAPSHOT LOG_LEVEL DOMAIN RPC_HOST RPC_LB WS_HOST WS_LB RPC_PORT WS_PORT P2P_PORT \
-             X_SRC_BUILD_TARGET X_SRC_REPO X_DOCKER_TAG X_DOCKER_REPO X_DOCKERFILE )
+             SCRIPT_TAG X_SRC_BUILD_TARGET X_SRC_REPO X_DOCKER_TAG X_DOCKER_REPO X_DOCKERFILE )
   OLD_VARS=( )
   NEW_VARS=( )
 
