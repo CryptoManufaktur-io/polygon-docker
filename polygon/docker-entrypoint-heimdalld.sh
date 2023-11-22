@@ -46,6 +46,7 @@ fi
 sed -i "/external_address = \".*\"/c\external_address = \"tcp:\/\/${SERVER_IP}:26656\"" /var/lib/heimdall/config/config.toml
 sed -i '/26657/c\laddr = "tcp://0.0.0.0:26657"' /var/lib/heimdall/config/config.toml
 sed -i "/moniker/c\moniker = \"${BOR_NODE_ID:-upbeatCucumber}\"" /var/lib/heimdall/config/config.toml
+sed -i "/prometheus =/c\prometheus = \"${ENABLE_PROMETHEUS_METRICS:-false}\"" /var/lib/heimdall/config/config.toml
 sed -i "/bor_rpc_url/c\bor_rpc_url = \"${HEIMDALL_BOR_RPC_URL}\"" /var/lib/heimdall/config/heimdall-config.toml
 sed -i "/eth_rpc_url/c\eth_rpc_url = \"${HEIMDALL_ETH_RPC_URL}\"" /var/lib/heimdall/config/heimdall-config.toml
 sed -i '/max_num_inbound_peers/c\max_num_inbound_peers = "300"' /var/lib/heimdall/config/heimdall-config.toml
