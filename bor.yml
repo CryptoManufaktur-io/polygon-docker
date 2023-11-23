@@ -32,6 +32,10 @@ services:
       - /etc/localtime:/etc/localtime:ro
     ports:
       - "26656:26656"
+    labels:
+      - metrics.scrape=true
+      - metrics.port=26660
+      - metrics.path=/metrics
 
   bor:
     image: bor:local
@@ -115,6 +119,9 @@ services:
       - ${BOR_P2P_PORT}:${BOR_P2P_PORT}/tcp
       - ${BOR_P2P_PORT}:${BOR_P2P_PORT}/udp
     labels:
+      - metrics.scrape=true
+      - metrics.port=6060
+      - metrics.path=/debug/metrics/prometheus
       - traefik.enable=true
       - traefik.http.routers.bor.service=bor
       - traefik.http.routers.bor.entrypoints=websecure
