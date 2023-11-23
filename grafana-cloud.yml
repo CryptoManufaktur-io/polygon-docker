@@ -22,12 +22,12 @@ services:
       context: ./prometheus
     image: prometheus:local
     pull_policy: build
+    user: root
     volumes:
       - prom-data:/prometheus
       - ./prometheus/custom-prom.yml:/etc/prometheus/custom-prom.yml:ro
       - /etc/localtime:/etc/localtime:ro
-    environment:
-      - CLIENT=${COMPOSE_FILE}
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     entrypoint: choose-config.sh
     command: ["/bin/prometheus", "--storage.tsdb.path=/prometheus", "--web.console.libraries=/usr/share/prometheus/console_libraries", "--web.console.templates=/usr/share/prometheus/consoles"]
     <<: *logging
@@ -52,9 +52,14 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /etc/localtime:/etc/localtime:ro
+    labels:
+      - metrics.scrape=true
+      - metrics.path=/metrics
+      - metrics.port=9100
     <<: *logging
 
   cadvisor:
+    restart: unless-stopped
     image: gcr.io/cadvisor/cadvisor
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -65,6 +70,10 @@ services:
     command:
       - --docker_only
       - --housekeeping_interval=30s
+    labels:
+      - metrics.scrape=true
+      - metrics.path=/metrics
+      - metrics.port=8080
     <<: *logging
 
 volumes:
