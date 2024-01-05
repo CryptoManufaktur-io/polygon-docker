@@ -584,7 +584,7 @@ prune-bor() {
   echo "There should be three stages: \"Iterating state snapshot\", \"Pruning state data\", and \"Compacting database\". During \
 the \"Compacting database\" stage it may not output logs for an hour or so, that is normal."
   echo
-  echo "When prune is done, which takes ~12 hours, Bor will automatically start again."
+  echo "When prune is done, which may take ~17-20 hours, Bor will automatically start again."
   echo
 }
 
