@@ -2,62 +2,41 @@
 set -euo pipefail
 
 extract_files() {
-    extract_dir=$1
-    compiled_files=$2
-    while read -r line; do
-        if [[ "${line}" == checksum* ]]; then
-            continue
-        fi
-        filename=`echo ${line} | awk -F/ '{print $NF}'`
-        echo "Extracting ${filename}"
-        if echo "${filename}" | grep -q "bulk"; then
-            pv -f ${filename} | zstdcat - | tar -xf - -C ${extract_dir}
-        else
-            pv -f ${filename} | zstdcat - | tar -xf - -C ${extract_dir} --strip-components=3
-        fi
-        rm -f ${filename}
-    done < ${compiled_files}
+  extract_dir=$1
+
+  declare -A processed_dates
+
+  # Join bulk parts into valid tar.zst and extract
+  for file in $(find . -name "bor-$NETWORK-snapshot-bulk-*-part-*" -print | sort); do
+      date_stamp=$(echo "$file" | grep -o 'snapshot-.*-part' | sed 's/snapshot-\(.*\)-part/\1/')
+
+      # Check if we have already processed this date
+      if [[ -z "${processed_dates[$date_stamp]:-}" ]]; then
+          processed_dates[$date_stamp]=1
+          output_tar="bor-$NETWORK-snapshot-${date_stamp}.tar.zst"
+          echo "Join parts for ${date_stamp} then extract"
+          cat bor-$NETWORK-snapshot-${date_stamp}-part* > "$output_tar"
+          rm bor-$NETWORK-snapshot-${date_stamp}-part*
+          pv -f -p $output_tar | zstdcat - | tar -xf - -C ${extract_dir} 2>&1 | stdbuf -o0 tr '\r' '\n' && rm $output_tar
+      fi
+  done
+
+  # Join incremental following day parts
+  for file in $(find . -name "bor-$NETWORK-snapshot-*-part-*" -print | sort); do
+      date_stamp=$(echo "$file" | grep -o 'snapshot-.*-part' | sed 's/snapshot-\(.*\)-part/\1/')
+
+      # Check if we have already processed this date
+      if [[ -z "${processed_dates[$date_stamp]}:-" ]]; then
+          processed_dates[$date_stamp]=1
+          output_tar="bor-$NETWORK-snapshot-${date_stamp}.tar.zst"
+          echo "Join parts for ${date_stamp} then extract"
+          cat bor-$NETWORK-snapshot-${date_stamp}-part* > "$output_tar"
+          rm bor-$NETWORK-snapshot-${date_stamp}-part*
+          pv -f -p $output_tar | zstdcat - | tar -xf - -C  ${extract_dir} --strip-components=3 2>&1 | stdbuf -o0 tr '\r' '\n' && rm $output_tar
+      fi
+  done
 }
 
-wget_files() {
-    extract_dir=$1
-    compiled_files=$2
-    while read -r line; do
-        if [[ "${line}" == checksum* ]]; then
-            continue
-        fi
-        filename="${line}"
-        echo "Extracting ${filename}"
-        if echo "${filename}" | grep -q "bulk"; then
-            wget -O - ${filename} | zstdcat - | tar -xf - -C ${extract_dir}
-        else
-            wget -O - ${filename} | zstdcat - | tar -xf - -C ${extract_dir} --strip-components=3
-        fi
-    done < ${compiled_files}
-}
-
-split_aria2_list() {
-    compiled_files=$1
-    bulk_file=$2
-    incremental_file=$3
-    
-    rm -f $bulk_file
-    rm -f $incremental_file
-
-    while IFS= read -r line; do
-        if [[ $line == *"bulk"* ]]; then
-            echo "$line" >> $bulk_file
-            IFS= read -r next_line
-            echo "$next_line" >> $bulk_file
-        else
-            echo "$line" >> $incremental_file
-            IFS= read -r next_line
-            echo "$next_line" >> $incremental_file
-        fi
-    done < ${compiled_files}
-}
-
-# allow the container to be started with `--user`
 # If started as root, chown the `--datadir` and run bor as bor
 if [ "$(id -u)" = '0' ]; then
    chown -R bor:bor /var/lib/bor
@@ -104,40 +83,10 @@ else
     workdir=$(pwd)
     cd /var/lib/bor/snapshots
     # download compiled incremental snapshot files list
-    aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true https://snapshot-download.polygon.technology/bor-${NETWORK}-incremental-compiled-files.txt
-    split_aria2_list bor-${NETWORK}-incremental-compiled-files.txt bor-bulk-file.txt bor-incremental-files.txt
-    if [ "${USE_ARIA}" = "true" ]; then
-        if [ ! -f /var/lib/bor/bulkdone ]; then
-            # download bulk file, includes automatic checksum verification per increment
-            aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true -i bor-bulk-file.txt
-            extract_files /var/lib/bor/data/bor/chaindata bor-bulk-file.txt
-            touch /var/lib/bor/bulkdone
-        fi
-        # download all incremental files, includes automatic checksum verification per increment
-        # Be space-saving and do this one by one
-        i=0
-        >bor-current-incremental.txt
-        while IFS= read -r entry; do
-            # Every two lines, pass the temp file to aria2c
-            if (( i % 2 == 0 )) && (( i != 0 )); then
-                aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true -i bor-current-incremental.txt
-                extract_files /var/lib/bor/data/bor/chaindata bor-current-incremental.txt
-                >bor-current-incremental.txt
-            fi
-            # Write the current line to the temp file
-            echo "$entry" >> bor-current-incremental.txt
-            ((i++))
-        done < bor-incremental-files.txt
-        # Get the final file
-        aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true -i bor-current-incremental.txt
-        extract_files /var/lib/bor/data/bor/chaindata bor-current-incremental.txt
-    else
-        if [ ! -f /var/lib/bor/bulkdone ]; then
-            wget_files /var/lib/bor/data/bor/chaindata bor-bulk-file.txt
-            touch /var/lib/bor/bulkdone
-        fi
-        wget_files /var/lib/bor/data/bor/chaindata bor-incremental-files.txt
-    fi
+    aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true https://snapshot-download.polygon.technology/bor-${NETWORK}-parts.txt
+    # download files, includes automatic checksum verification per increment
+    aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true -i bor-${NETWORK}-parts.txt
+    extract_files /var/lib/bor/data/bor/chaindata
     cd "${workdir}"
     touch /var/lib/bor/setupdone
   fi
