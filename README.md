@@ -1,17 +1,17 @@
-# polygon-docker: Docker automation for Polygon RPC nodes
+# Polygon Docker: Docker automation for Polygon RPC nodes
 
 ## Overview
 
-polygon-docker follows [eth-docker](https://eth-docker.net) conventions. A lot of the same basic patterns,
+Polygon Docker follows [Eth Docker](https://eth-docker.net) conventions. A lot of the same basic patterns,
 such as for traefik access, apply.
 
 ## Getting Started
 
-For a quick start, you can install prerequisites and configure polygon-docker, as a non-root user:
+For a quick start, you can install prerequisites and configure Polygon Docker, as a non-root user:
 
 * `cd ~ && git clone https://github.com/CryptoManufaktur-io/polygon-docker.git && cd polygon-docker`
-* `./ethd install`
-* `cp default.env .env` and adjust snapshot locations.
+* `./polygond install`
+* `cp default.env .env` and adjust network, Ethereum RPC URL, node ID, and desired version tags
 
 ## Initial heimdalld peering
 
@@ -25,4 +25,4 @@ If heimdalld cannot find peers after half an hour or, a workaround is to take a 
 
 # Version
 
-This is polygon-docker v1.1.1
+This is Polygon Docker v2.0.0

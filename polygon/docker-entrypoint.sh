@@ -85,7 +85,31 @@ else
     # download compiled incremental snapshot files list
     aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true https://snapshot-download.polygon.technology/bor-${NETWORK}-parts.txt
     # download files, includes automatic checksum verification per increment
-    aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true -i bor-${NETWORK}-parts.txt
+    aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=bor-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i bor-${NETWORK}-parts.txt
+
+    max_retries=5
+    retry_count=0
+
+    while [ $retry_count -lt $max_retries ]; do
+      echo "Retrying failed parts, attempt $((retry_count + 1))..."
+      aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=bor-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i bor-$NETWORK-failures.txt
+
+      # Check the exit status of the aria2c command
+      if [ $? -eq 0 ]; then
+          echo "Command succeeded."
+          break  # Exit the loop since the command succeeded
+      else
+          echo "Command failed. Retrying..."
+          retry_count=$((retry_count + 1))
+      fi
+    done
+
+    # Don't extract if download/retries failed.
+    if [ $retry_count -eq $max_retries ]; then
+        echo "Download failed. Restart the script to resume downloading."
+        exit 1
+    fi
+
     extract_files /var/lib/bor/data/bor/chaindata
     cd "${workdir}"
     touch /var/lib/bor/setupdone
