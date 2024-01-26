@@ -50,7 +50,7 @@ if [ ! -f /var/lib/heimdall/setupdone ]; then
   workdir=$(pwd)
   cd /var/lib/heimdall/snapshots
   # download snapshot files list
-  aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true https://snapshot-download.polygon.technology/heimdall-${NETWORK}-parts.txt
+  aria2c -x6 -s6 https://snapshot-download.polygon.technology/heimdall-${NETWORK}-parts.txt
   # download all files, includes automatic checksum verification per increment
   set +e
   aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=heimdall-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i heimdall-${NETWORK}-parts.txt

@@ -82,8 +82,8 @@ else
     mkdir -p /var/lib/bor/snapshots
     workdir=$(pwd)
     cd /var/lib/bor/snapshots
-    # download compiled incremental snapshot files list
-    aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true https://snapshot-download.polygon.technology/bor-${NETWORK}-parts.txt
+    # download snapshot files list
+    aria2c -x6 -s6 https://snapshot-download.polygon.technology/bor-${NETWORK}-parts.txt
     set +e
     # download files, includes automatic checksum verification per increment
     aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=bor-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i bor-${NETWORK}-parts.txt
