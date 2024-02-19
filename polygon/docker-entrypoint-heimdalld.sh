@@ -41,7 +41,7 @@ extract_files() {
 # If started as root, chown the `--datadir` and run heimdalld as heimdall
 if [ "$(id -u)" = '0' ]; then
    chown -R heimdall:heimdall /var/lib/heimdall
-   exec gosu heimdall "$BASH_SOURCE" $@
+   exec su-exec heimdall "$BASH_SOURCE" $@
 fi
 
 if [ ! -f /var/lib/heimdall/setupdone ]; then
