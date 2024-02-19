@@ -2,7 +2,7 @@ ARG DOCKER_TAG
 
 FROM 0xpolygon/heimdall:${DOCKER_TAG}
 
-RUN apk update && apt-get add ca-certificates bash tzdata su-exec curl zstd pv aria2 coreutils
+RUN apk update && apk add ca-certificates bash tzdata su-exec curl zstd pv aria2 coreutils
 
 ARG USER=heimdall
 ARG UID=10000
