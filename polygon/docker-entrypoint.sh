@@ -17,7 +17,7 @@ extract_files() {
           echo "Join parts for ${date_stamp} then extract"
           cat bor-$NETWORK-snapshot-${date_stamp}-part* > "$output_tar"
           rm bor-$NETWORK-snapshot-${date_stamp}-part*
-          pv -f -p $output_tar | zstdcat - | tar -xf - -C ${extract_dir} 2>&1 | stdbuf -o0 tr '\r' '\n' && rm $output_tar
+          pv -f -p $output_tar | zstdcat - | tar -xf - -C ${extract_dir} 2>&1 && rm $output_tar
       fi
   done
 
@@ -32,7 +32,7 @@ extract_files() {
           echo "Join parts for ${date_stamp} then extract"
           cat bor-$NETWORK-snapshot-${date_stamp}-part* > "$output_tar"
           rm bor-$NETWORK-snapshot-${date_stamp}-part*
-          pv -f -p $output_tar | zstdcat - | tar -xf - -C  ${extract_dir} --strip-components=3 2>&1 | stdbuf -o0 tr '\r' '\n' && rm $output_tar
+          pv -f -p $output_tar | zstdcat - | tar -xf - -C  ${extract_dir} --strip-components=3 2>&1 && rm $output_tar
       fi
   done
 }
