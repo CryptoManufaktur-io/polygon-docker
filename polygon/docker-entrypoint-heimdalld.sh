@@ -87,7 +87,7 @@ SERVER_IP=$(curl -s ifconfig.me)
 if [ -n "${HEIMDALL_SEEDS}" ]; then
   sed -i "/seeds =/c\seeds = \"${HEIMDALL_SEEDS}\"" /var/lib/heimdall/config/config.toml
 fi
-sed -i "/external_address = \".*\"/c\external_address = \"tcp:\/\/${SERVER_IP}:26656\"" /var/lib/heimdall/config/config.toml
+sed -i "/external_address = \".*\"/c\external_address = \"tcp:\/\/${SERVER_IP}:${HEIMDALL_P2P_PORT}\"" /var/lib/heimdall/config/config.toml
 sed -i '/26657/c\laddr = "tcp://0.0.0.0:26657"' /var/lib/heimdall/config/config.toml
 sed -i "/moniker/c\moniker = \"${BOR_NODE_ID:-upbeatCucumber}\"" /var/lib/heimdall/config/config.toml
 sed -i "/prometheus =/c\prometheus = \"${ENABLE_PROMETHEUS_METRICS:-false}\"" /var/lib/heimdall/config/config.toml

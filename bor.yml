@@ -11,6 +11,7 @@ services:
     user: root
     environment:
       - NETWORK=${NETWORK}
+      - HEIMDALL_P2P_PORT=${HEIMDALL_P2P_PORT}
       - HEIMDALL_BOR_RPC_URL=${HEIMDALL_BOR_RPC_URL}
       - HEIMDALL_ETH_RPC_URL=${HEIMDALL_ETH_RPC_URL}
       - HEIMDALL_SEEDS=${HEIMDALL_SEEDS}
@@ -31,7 +32,7 @@ services:
       - heimdall-data:/var/lib/heimdall
       - /etc/localtime:/etc/localtime:ro
     ports:
-      - "26656:26656"
+      - ${HEIMDALL_P2P_PORT:-26656}:${HEIMDALL_P2P_PORT:-26656}/tcp
     labels:
       - metrics.scrape=true
       - metrics.port=26660
