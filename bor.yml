@@ -6,12 +6,13 @@ services:
       args:
         - DOCKER_TAG=${HEIMDALL_TAG}
     image: heimdall:local
-    pull_policy: build
+    pull_policy: never
 #    tty: true
     user: root
     environment:
       - NETWORK=${NETWORK}
-      - HEIMDALL_P2P_PORT=${HEIMDALL_P2P_PORT}
+      - HEIMDALL_P2P_PORT=${HEIMDALL_P2P_PORT:-26656}
+      - HEIMDALL_RPC_PORT=${HEIMDALL_RPC_PORT:-26657}
       - HEIMDALL_BOR_RPC_URL=${HEIMDALL_BOR_RPC_URL}
       - HEIMDALL_ETH_RPC_URL=${HEIMDALL_ETH_RPC_URL}
       - HEIMDALL_SEEDS=${HEIMDALL_SEEDS}
@@ -40,7 +41,7 @@ services:
 
   bor:
     image: bor:local
-    pull_policy: build
+    pull_policy: never
     build:
       context: ./polygon
       dockerfile: ${BOR_DOCKER_FILE}

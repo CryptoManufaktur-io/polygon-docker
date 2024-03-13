@@ -46,53 +46,56 @@ fi
 
 if [ ! -f /var/lib/heimdall/setupdone ]; then
   heimdalld init --home /var/lib/heimdall --chain ${NETWORK}
-  mkdir -p /var/lib/heimdall/snapshots
-  workdir=$(pwd)
-  cd /var/lib/heimdall/snapshots
-  # download snapshot files list
-  aria2c -x6 -s6 https://snapshot-download.polygon.technology/heimdall-${NETWORK}-parts.txt
-  # download all files, includes automatic checksum verification per increment
-  set +e
-  aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=heimdall-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i heimdall-${NETWORK}-parts.txt
+  if [ ! ${NETWORK} = "amoy" ]; then
+    mkdir -p /var/lib/heimdall/snapshots
+    workdir=$(pwd)
+    cd /var/lib/heimdall/snapshots
+    # download snapshot files list
+    aria2c -x6 -s6 https://snapshot-download.polygon.technology/heimdall-${NETWORK}-parts.txt
+    # download all files, includes automatic checksum verification per increment
+    set +e
+    aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=heimdall-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i heimdall-${NETWORK}-parts.txt
 
-  max_retries=5
-  retry_count=0
+    max_retries=5
+    retry_count=0
 
-  while [ $retry_count -lt $max_retries ]; do
-    echo "Retrying failed parts, attempt $((retry_count + 1))..."
-    aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=heimdall-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i heimdall-$NETWORK-failures.txt
+    while [ $retry_count -lt $max_retries ]; do
+      echo "Retrying failed parts, attempt $((retry_count + 1))..."
+      aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=heimdall-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i heimdall-$NETWORK-failures.txt
 
-    # Check the exit status of the aria2c command
-    if [ $? -eq 0 ]; then
-        echo "Command succeeded."
-        break  # Exit the loop since the command succeeded
-    else
-        echo "Command failed. Retrying..."
-        retry_count=$((retry_count + 1))
+      # Check the exit status of the aria2c command
+      if [ $? -eq 0 ]; then
+          echo "Command succeeded."
+          break  # Exit the loop since the command succeeded
+      else
+          echo "Command failed. Retrying..."
+          retry_count=$((retry_count + 1))
+      fi
+    done
+
+    # Don't extract if download/retries failed.
+    if [ $retry_count -eq $max_retries ]; then
+        echo "Download failed. Restart the script to resume downloading."
+        exit 1
     fi
-  done
 
-  # Don't extract if download/retries failed.
-  if [ $retry_count -eq $max_retries ]; then
-      echo "Download failed. Restart the script to resume downloading."
-      exit 1
+    set -e
+    extract_files /var/lib/heimdall/data
+    cd "${workdir}"
   fi
-
-  set -e
-  extract_files /var/lib/heimdall/data
-  cd "${workdir}"
   touch /var/lib/heimdall/setupdone
 fi
 SERVER_IP=$(curl -s ifconfig.me)
 if [ -n "${HEIMDALL_SEEDS}" ]; then
-  sed -i "/seeds =/c\seeds = \"${HEIMDALL_SEEDS}\"" /var/lib/heimdall/config/config.toml
+  dasel put -v "${HEIMDALL_SEEDS}" -f /var/lib/heimdall/config/config.toml 'p2p.seeds'
 fi
-sed -i "/external_address = \".*\"/c\external_address = \"tcp:\/\/${SERVER_IP}:${HEIMDALL_P2P_PORT}\"" /var/lib/heimdall/config/config.toml
-sed -i '/26657/c\laddr = "tcp://0.0.0.0:26657"' /var/lib/heimdall/config/config.toml
-sed -i "/moniker/c\moniker = \"${BOR_NODE_ID:-upbeatCucumber}\"" /var/lib/heimdall/config/config.toml
-sed -i "/prometheus =/c\prometheus = \"${ENABLE_PROMETHEUS_METRICS:-false}\"" /var/lib/heimdall/config/config.toml
-sed -i "/bor_rpc_url/c\bor_rpc_url = \"${HEIMDALL_BOR_RPC_URL}\"" /var/lib/heimdall/config/heimdall-config.toml
-sed -i "/eth_rpc_url/c\eth_rpc_url = \"${HEIMDALL_ETH_RPC_URL}\"" /var/lib/heimdall/config/heimdall-config.toml
-sed -i '/max_num_inbound_peers/c\max_num_inbound_peers = "300"' /var/lib/heimdall/config/config.toml
-sed -i '/max_num_outbound_peers/c\max_num_outbound_peers = "100"' /var/lib/heimdall/config/config.toml
+dasel put -v "tcp://0.0.0.0:${HEIMDALL_RPC_PORT}" -f /var/lib/heimdall/config/config.toml 'rpc.laddr'
+dasel put -v "tcp://${SERVER_IP}:${HEIMDALL_P2P_PORT}" -f /var/lib/heimdall/config/config.toml 'p2p.external_address'
+dasel put -v "tcp://0.0.0.0:${HEIMDALL_P2P_PORT}" -f /var/lib/heimdall/config/config.toml 'p2p.laddr'
+dasel put -v "${BOR_NODE_ID:-upbeatCucumber}" -f /var/lib/heimdall/config/config.toml 'moniker'
+dasel put -v "${ENABLE_PROMETHEUS_METRICS:-false}" -f /var/lib/heimdall/config/config.toml 'instrumentation.prometheus'
+dasel put -v "300" -f /var/lib/heimdall/config/config.toml 'p2p.max_num_inbound_peers'
+dasel put -v "100" -f /var/lib/heimdall/config/config.toml 'p2p.max_num_outbound_peers'
+dasel put -v "${HEIMDALL_BOR_RPC_URL}" -f /var/lib/heimdall/config/heimdall-config.toml 'bor_rpc_url'
+dasel put -v "${HEIMDALL_ETH_RPC_URL}" -f /var/lib/heimdall/config/heimdall-config.toml 'eth_rpc_url'
 exec "$@"
