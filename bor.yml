@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile.heimdall
       args:
         - DOCKER_TAG=${HEIMDALL_TAG}
-    image: heimdall:local
+    image: heimdall:${NETWORK}
     pull_policy: never
 #    tty: true
     user: root
@@ -20,6 +20,10 @@ services:
       - ENABLE_PROMETHEUS_METRICS=true
     restart: unless-stopped
     stop_grace_period: 1m
+    networks:
+      default:
+        aliases:
+          - ${NETWORK}-heimdalld # This allows multiple Polygon Docker stacks all connected to the same central traefik
     entrypoint:
       - docker-entrypoint.sh
       - heimdalld
@@ -40,7 +44,7 @@ services:
       - metrics.path=/metrics
 
   bor:
-    image: bor:local
+    image: bor:${NETWORK}
     pull_policy: never
     build:
       context: ./polygon
@@ -59,6 +63,10 @@ services:
       - USE_ARIA=${USE_ARIA:-true}
       - TRUSTED_NODES=${BOR_TRUSTED_NODES:-}
       - EXTRAS=${BOR_EXTRAS:-}
+    networks:
+      default:
+        aliases:
+          - ${NETWORK}-bor # This allows multiple Polygon Docker stacks all connected to the same central traefik
     entrypoint:
       - docker-entrypoint.sh
       - --datadir
@@ -90,7 +98,7 @@ services:
       - --txpool.accountslots
       - "256"
       - --bor.heimdall
-      - http://heimdalld:1317
+      - http://${NETWORK}-heimdalld:1317
       - --txpool.accountqueue
       - "64"
       - --txpool.globalqueue
