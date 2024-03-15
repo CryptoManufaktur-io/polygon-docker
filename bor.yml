@@ -18,6 +18,7 @@ services:
       - HEIMDALL_SEEDS=${HEIMDALL_SEEDS}
       - BOR_NODE_ID=${BOR_NODE_ID}
       - ENABLE_PROMETHEUS_METRICS=true
+      - LOG_LEVEL=${LOG_LEVEL}
     restart: unless-stopped
     stop_grace_period: 1m
     networks:
