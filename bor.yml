@@ -143,7 +143,7 @@ services:
       - traefik.http.routers.borlb-${EL_HOST}.rule=Host(`${EL_LB}.${DOMAIN}`)
       - traefik.http.routers.borlb-${EL_HOST}.tls.certresolver=letsencrypt
       - traefik.http.services.bor-${EL_HOST}.loadbalancer.server.port=${BOR_RPC_PORT}
-      - traefik.http.routers.borws-${EL_WS_HOST}.service=-${EL_WS_HOST}
+      - traefik.http.routers.borws-${EL_WS_HOST}.service=borws-${EL_WS_HOST}
       - traefik.http.routers.borws-${EL_WS_HOST}.entrypoints=websecure
       - traefik.http.routers.borws-${EL_WS_HOST}.rule=Host(`${EL_WS_HOST}.${DOMAIN}`)
       - traefik.http.routers.borws-${EL_WS_HOST}.tls.certresolver=letsencrypt
