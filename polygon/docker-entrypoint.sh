@@ -17,7 +17,7 @@ extract_files() {
           echo "Join parts for ${date_stamp} then extract"
           cat bor-$NETWORK-snapshot-${date_stamp}-part* > "$output_tar"
           rm bor-$NETWORK-snapshot-${date_stamp}-part*
-          pv -f -p $output_tar | zstdcat - | tar -xf - -C ${extract_dir} 2>&1 | stdbuf -o0 tr '\r' '\n' && rm $output_tar
+          pv -f -p $output_tar | zstdcat - | tar -xf - -C ${extract_dir} 2>&1 && rm $output_tar
       fi
   done
 
@@ -32,7 +32,7 @@ extract_files() {
           echo "Join parts for ${date_stamp} then extract"
           cat bor-$NETWORK-snapshot-${date_stamp}-part* > "$output_tar"
           rm bor-$NETWORK-snapshot-${date_stamp}-part*
-          pv -f -p $output_tar | zstdcat - | tar -xf - -C  ${extract_dir} --strip-components=3 2>&1 | stdbuf -o0 tr '\r' '\n' && rm $output_tar
+          pv -f -p $output_tar | zstdcat - | tar -xf - -C  ${extract_dir} --strip-components=3 2>&1 && rm $output_tar
       fi
   done
 }
@@ -78,42 +78,44 @@ if [ -f /var/lib/bor/prune-marker ]; then
   exec bor snapshot prune-state --datadir /var/lib/bor/data
 else
   if [ ! -f /var/lib/bor/setupdone ]; then
-    mkdir -p /var/lib/bor/data/bor/chaindata
-    mkdir -p /var/lib/bor/snapshots
-    workdir=$(pwd)
-    cd /var/lib/bor/snapshots
-    # download snapshot files list
-    aria2c -x6 -s6 https://snapshot-download.polygon.technology/bor-${NETWORK}-parts.txt
-    set +e
-    # download files, includes automatic checksum verification per increment
-    aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=bor-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i bor-${NETWORK}-parts.txt
+    if [ ! ${NETWORK} = "amoy" ]; then
+      mkdir -p /var/lib/bor/data/bor/chaindata
+      mkdir -p /var/lib/bor/snapshots
+      workdir=$(pwd)
+      cd /var/lib/bor/snapshots
+      # download snapshot files list
+      aria2c -x6 -s6 https://snapshot-download.polygon.technology/bor-${NETWORK}-parts.txt
+      set +e
+      # download files, includes automatic checksum verification per increment
+      aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=bor-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i bor-${NETWORK}-parts.txt
 
-    max_retries=5
-    retry_count=0
+      max_retries=5
+      retry_count=0
 
-    while [ $retry_count -lt $max_retries ]; do
-      echo "Retrying failed parts, attempt $((retry_count + 1))..."
-      aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=bor-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i bor-$NETWORK-failures.txt
+      while [ $retry_count -lt $max_retries ]; do
+        echo "Retrying failed parts, attempt $((retry_count + 1))..."
+        aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=bor-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i bor-$NETWORK-failures.txt
 
-      # Check the exit status of the aria2c command
-      if [ $? -eq 0 ]; then
-          echo "Command succeeded."
-          break  # Exit the loop since the command succeeded
-      else
-          echo "Command failed. Retrying..."
-          retry_count=$((retry_count + 1))
+        # Check the exit status of the aria2c command
+        if [ $? -eq 0 ]; then
+            echo "Command succeeded."
+            break  # Exit the loop since the command succeeded
+        else
+            echo "Command failed. Retrying..."
+            retry_count=$((retry_count + 1))
+        fi
+      done
+
+      # Don't extract if download/retries failed.
+      if [ $retry_count -eq $max_retries ]; then
+          echo "Download failed. Restart the script to resume downloading."
+          exit 1
       fi
-    done
 
-    # Don't extract if download/retries failed.
-    if [ $retry_count -eq $max_retries ]; then
-        echo "Download failed. Restart the script to resume downloading."
-        exit 1
+      set -e
+      extract_files /var/lib/bor/data/bor/chaindata
+      cd "${workdir}"
     fi
-    
-    set -e
-    extract_files /var/lib/bor/data/bor/chaindata
-    cd "${workdir}"
     touch /var/lib/bor/setupdone
   fi
   bor dumpconfig "$@" ${__verbosity} ${__bootnodes} ${EXTRAS} >/var/lib/bor/config.toml

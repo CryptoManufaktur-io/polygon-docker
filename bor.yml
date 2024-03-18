@@ -5,19 +5,26 @@ services:
       dockerfile: Dockerfile.heimdall
       args:
         - DOCKER_TAG=${HEIMDALL_TAG}
-    image: heimdall:local
-    pull_policy: build
+    image: heimdall:${NETWORK}
+    pull_policy: never
 #    tty: true
     user: root
     environment:
       - NETWORK=${NETWORK}
+      - HEIMDALL_P2P_PORT=${HEIMDALL_P2P_PORT:-26656}
+      - HEIMDALL_RPC_PORT=${HEIMDALL_RPC_PORT:-26657}
       - HEIMDALL_BOR_RPC_URL=${HEIMDALL_BOR_RPC_URL}
       - HEIMDALL_ETH_RPC_URL=${HEIMDALL_ETH_RPC_URL}
       - HEIMDALL_SEEDS=${HEIMDALL_SEEDS}
       - BOR_NODE_ID=${BOR_NODE_ID}
       - ENABLE_PROMETHEUS_METRICS=true
+      - LOG_LEVEL=${LOG_LEVEL}
     restart: unless-stopped
     stop_grace_period: 1m
+    networks:
+      default:
+        aliases:
+          - ${NETWORK}-heimdalld # This allows multiple Polygon Docker stacks all connected to the same central traefik
     entrypoint:
       - docker-entrypoint.sh
       - heimdalld
@@ -31,15 +38,15 @@ services:
       - heimdall-data:/var/lib/heimdall
       - /etc/localtime:/etc/localtime:ro
     ports:
-      - "26656:26656"
+      - ${HEIMDALL_P2P_PORT:-26656}:${HEIMDALL_P2P_PORT:-26656}/tcp
     labels:
       - metrics.scrape=true
       - metrics.port=26660
       - metrics.path=/metrics
 
   bor:
-    image: bor:local
-    pull_policy: build
+    image: bor:${NETWORK}
+    pull_policy: never
     build:
       context: ./polygon
       dockerfile: ${BOR_DOCKER_FILE}
@@ -57,6 +64,10 @@ services:
       - USE_ARIA=${USE_ARIA:-true}
       - TRUSTED_NODES=${BOR_TRUSTED_NODES:-}
       - EXTRAS=${BOR_EXTRAS:-}
+    networks:
+      default:
+        aliases:
+          - ${NETWORK}-bor # This allows multiple Polygon Docker stacks all connected to the same central traefik
     entrypoint:
       - docker-entrypoint.sh
       - --datadir
@@ -88,7 +99,7 @@ services:
       - --txpool.accountslots
       - "256"
       - --bor.heimdall
-      - http://heimdalld:1317
+      - http://${NETWORK}-heimdalld:1317
       - --txpool.accountqueue
       - "64"
       - --txpool.globalqueue

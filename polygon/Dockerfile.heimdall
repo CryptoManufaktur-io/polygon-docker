@@ -1,5 +1,8 @@
 ARG DOCKER_TAG
 
+# Get dasel
+FROM ghcr.io/tomwright/dasel:v2.5.0-alpine as dasel
+
 FROM 0xpolygon/heimdall:${DOCKER_TAG}
 
 RUN apk update && apk add ca-certificates bash tzdata su-exec curl zstd pv aria2 coreutils
@@ -19,6 +22,7 @@ RUN mkdir -p /var/lib/heimdall/snapshots && chown -R ${USER}:${USER} /var/lib/he
 
 WORKDIR /var/lib/heimdall
 
+COPY --from=dasel /usr/local/bin/dasel /usr/local/bin/
 COPY ./docker-entrypoint-heimdalld.sh /usr/local/bin/docker-entrypoint.sh
 
 USER ${USER}
