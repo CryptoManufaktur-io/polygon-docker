@@ -134,24 +134,24 @@ services:
       - metrics.port=6060
       - metrics.path=/debug/metrics/prometheus
       - traefik.enable=true
-      - traefik.http.routers.bor-${EL_HOST}.service=bor-${EL_HOST}
-      - traefik.http.routers.bor-${EL_HOST}.entrypoints=websecure
-      - traefik.http.routers.bor-${EL_HOST}.rule=Host(`${EL_HOST}.${DOMAIN}`)
-      - traefik.http.routers.bor-${EL_HOST}.tls.certresolver=letsencrypt
-      - traefik.http.routers.borlb-${EL_HOST}.service=bor-${EL_HOST}
-      - traefik.http.routers.borlb-${EL_HOST}.entrypoints=websecure
-      - traefik.http.routers.borlb-${EL_HOST}.rule=Host(`${EL_LB}.${DOMAIN}`)
-      - traefik.http.routers.borlb-${EL_HOST}.tls.certresolver=letsencrypt
-      - traefik.http.services.bor-${EL_HOST}.loadbalancer.server.port=${BOR_RPC_PORT}
-      - traefik.http.routers.borws-${EL_WS_HOST}.service=borws-${EL_WS_HOST}
-      - traefik.http.routers.borws-${EL_WS_HOST}.entrypoints=websecure
-      - traefik.http.routers.borws-${EL_WS_HOST}.rule=Host(`${EL_WS_HOST}.${DOMAIN}`)
-      - traefik.http.routers.borws-${EL_WS_HOST}.tls.certresolver=letsencrypt
-      - traefik.http.routers.borwslb-${EL_WS_HOST}.service=borws-${EL_WS_HOST}
-      - traefik.http.routers.borwslb-${EL_WS_HOST}.entrypoints=websecure
-      - traefik.http.routers.borwslb-${EL_WS_HOST}.rule=Host(`${EL_WS_LB}.${DOMAIN}`)
-      - traefik.http.routers.borwslb-${EL_WS_HOST}.tls.certresolver=letsencrypt
-      - traefik.http.services.borws-${EL_WS_HOST}.loadbalancer.server.port=${BOR_WS_PORT}
+      - traefik.http.routers.${RPC_HOST:-polygon}.service=${RPC_HOST:-polygon}
+      - traefik.http.routers.${RPC_HOST:-polygon}.entrypoints=websecure
+      - traefik.http.routers.${RPC_HOST:-polygon}.rule=Host(`${RPC_HOST:-polygon}.${DOMAIN}`)
+      - traefik.http.routers.${RPC_HOST:-polygon}.tls.certresolver=letsencrypt
+      - traefik.http.routers.${RPC_HOST:-polygon}lb.service=${RPC_HOST:-polygon}
+      - traefik.http.routers.${RPC_HOST:-polygon}lb.entrypoints=websecure
+      - traefik.http.routers.${RPC_HOST:-polygon}lb.rule=Host(`${RPC_LB:-polygon-lb}.${DOMAIN}`)
+      - traefik.http.routers.${RPC_HOST:-polygon}lb.tls.certresolver=letsencrypt
+      - traefik.http.services.${RPC_HOST:-polygon}.loadbalancer.server.port=${BOR_RPC_PORT:-8545}
+      - traefik.http.routers.${WS_HOST:-polygonws}.service=${WS_HOST:-polygonws}
+      - traefik.http.routers.${WS_HOST:-polygonws}.entrypoints=websecure
+      - traefik.http.routers.${WS_HOST:-polygonws}.rule=Host(`${WS_HOST:-polygonws}.${DOMAIN}`)
+      - traefik.http.routers.${WS_HOST:-polygonws}.tls.certresolver=letsencrypt
+      - traefik.http.routers.${WS_HOST:-polygonws}lb.service=${WS_HOST:-polygonws}
+      - traefik.http.routers.${WS_HOST:-polygonws}lb.entrypoints=websecure
+      - traefik.http.routers.${WS_HOST:-polygonws}lb.rule=Host(`${WS_LB:-polygonws-lb}.${DOMAIN}`)
+      - traefik.http.routers.${WS_HOST:-polygonws}lb.tls.certresolver=letsencrypt
+      - traefik.http.services.${WS_HOST:-polygonws}.loadbalancer.server.port=${BOR_WS_PORT:-8546}
 
   set-prune-marker:
     profiles: ["tools"]
