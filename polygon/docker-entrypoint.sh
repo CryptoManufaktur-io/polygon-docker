@@ -115,11 +115,13 @@ else
       set -e
       extract_files /var/lib/bor/data/bor/chaindata
       cd "${workdir}"
-      __pbss=""
-    else
-      __pbss="--db.engine pebble --state.scheme path"
     fi
     touch /var/lib/bor/setupdone
+  fi
+  if [ ! ${NETWORK} = "amoy" ]; then
+    __pbss=""
+  else
+    __pbss="--db.engine pebble --state.scheme path"
   fi
   bor dumpconfig "$@" ${__pbss} ${__verbosity} ${__bootnodes} ${EXTRAS} >/var/lib/bor/config.toml
   # Set user-supplied trusted nodes, also as static
