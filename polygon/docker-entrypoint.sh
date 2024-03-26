@@ -115,10 +115,13 @@ else
       set -e
       extract_files /var/lib/bor/data/bor/chaindata
       cd "${workdir}"
+      __pbss=""
+    else
+      __pbss="--db.engine pebble --state.scheme path"
     fi
     touch /var/lib/bor/setupdone
   fi
-  bor dumpconfig "$@" ${__verbosity} ${__bootnodes} ${EXTRAS} >/var/lib/bor/config.toml
+  bor dumpconfig "$@" ${__pbss} ${__verbosity} ${__bootnodes} ${EXTRAS} >/var/lib/bor/config.toml
   # Set user-supplied trusted nodes, also as static
   if [ -n "${TRUSTED_NODES}" ]; then
     for string in $(jq -r .[] <<< "${TRUSTED_NODES}"); do
