@@ -26,7 +26,7 @@ extract_files() {
       date_stamp=$(echo "$file" | grep -o 'snapshot-.*-part' | sed 's/snapshot-\(.*\)-part/\1/')
 
       # Check if we have already processed this date
-      if [[ -z "${processed_dates[$date_stamp]}:-" ]]; then
+      if [[ -z "${processed_dates[$date_stamp]:-}" ]]; then
           processed_dates[$date_stamp]=1
           output_tar="bor-$NETWORK-snapshot-${date_stamp}.tar.zst"
           echo "Join parts for ${date_stamp} then extract"
@@ -78,47 +78,72 @@ if [ -f /var/lib/bor/prune-marker ]; then
   exec bor snapshot prune-state --datadir /var/lib/bor/data
 else
   if [ ! -f /var/lib/bor/setupdone ]; then
-    if [ ! ${NETWORK} = "amoy" ]; then
+    if [ -n "${SNAPSHOT}" ]; then
       mkdir -p /var/lib/bor/data/bor/chaindata
       mkdir -p /var/lib/bor/snapshots
       workdir=$(pwd)
       cd /var/lib/bor/snapshots
-      # download snapshot files list
-      aria2c -x6 -s6 https://snapshot-download.polygon.technology/bor-${NETWORK}-parts.txt
-      set +e
-      # download files, includes automatic checksum verification per increment
-      aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=bor-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i bor-${NETWORK}-parts.txt
+      if [[ "${SNAPSHOT}" =~ "bor-${NETWORK}-parts.txt" ]]; then
+        # download snapshot files list
+        aria2c -x6 -s6 "${SNAPSHOT}"
+        set +e
+        # download files, includes automatic checksum verification per increment
+        aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=bor-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i bor-${NETWORK}-parts.txt
 
-      max_retries=5
-      retry_count=0
+        max_retries=5
+        retry_count=0
 
-      while [ $retry_count -lt $max_retries ]; do
-        echo "Retrying failed parts, attempt $((retry_count + 1))..."
-        aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=bor-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i bor-$NETWORK-failures.txt
+        while [ $retry_count -lt $max_retries ]; do
+          echo "Retrying failed parts, attempt $((retry_count + 1))..."
+          aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=bor-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i bor-$NETWORK-failures.txt
 
-        # Check the exit status of the aria2c command
-        if [ $? -eq 0 ]; then
-            echo "Command succeeded."
-            break  # Exit the loop since the command succeeded
-        else
-            echo "Command failed. Retrying..."
-            retry_count=$((retry_count + 1))
+          # Check the exit status of the aria2c command
+          if [ $? -eq 0 ]; then
+              echo "Command succeeded."
+              break  # Exit the loop since the command succeeded
+          else
+              echo "Command failed. Retrying..."
+              retry_count=$((retry_count + 1))
+          fi
+        done
+
+        # Don't extract if download/retries failed.
+        if [ $retry_count -eq $max_retries ]; then
+            echo "Download failed. Restart the script to resume downloading."
+            exit 1
         fi
-      done
 
-      # Don't extract if download/retries failed.
-      if [ $retry_count -eq $max_retries ]; then
-          echo "Download failed. Restart the script to resume downloading."
-          exit 1
+        set -e
+        extract_files /var/lib/bor/data/bor/chaindata
+      else
+        aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true "${SNAPSHOT}"
+        filename=$(echo "${SNAPSHOT}" | awk -F/ '{print $NF}')
+        if [[ "${filename}" =~ \.tar\.zst$ ]]; then
+          pzstd -c -d "${filename}" | tar xvf - -C /var/lib/bor/data/bor/
+        elif [[ "${filename}" =~ \.tar\.gz$ || "${filename}" =~ \.tgz$ ]]; then
+          tar xzvf "${filename}" -C /var/lib/bor/data/bor/
+        elif [[ "${filename}" =~ \.tar$ ]]; then
+          tar xvf "${filename}" -C /var/lib/bor/data/bor/
+        elif [[ "${filename}" =~ \.lz4$ ]]; then
+          lz4 -d "${filename}" | tar xvf - -C /var/lib/bor/data/bor/
+        else
+          __dont_rm=1
+          echo "The snapshot file has a format that Polygon Docker can't handle."
+          echo "Please come to CryptoManufaktur Discord to work through this."
+        fi
+        if [ "${__dont_rm}" -eq 0 ]; then
+          rm -f "${filename}"
+        fi
+        if [[ ! -d "/var/lib/bor/data/bor/chaindata" ]]; then
+          echo "Chaindata isn't in the expected location."
+          echo "This snapshot likely won't work until the fetch script has been adjusted for it."
+        fi
       fi
-
-      set -e
-      extract_files /var/lib/bor/data/bor/chaindata
       cd "${workdir}"
     fi
     touch /var/lib/bor/setupdone
   fi
-  if [ ! ${NETWORK} = "amoy" ]; then
+  if [ -d "/var/lib/bor/data/bor/chaindata" ]; then
     __pbss=""
   else
     __pbss="--db.engine pebble --state.scheme path"

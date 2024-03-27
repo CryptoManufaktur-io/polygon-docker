@@ -19,6 +19,7 @@ services:
       - BOR_NODE_ID=${BOR_NODE_ID}
       - ENABLE_PROMETHEUS_METRICS=true
       - LOG_LEVEL=${LOG_LEVEL}
+      - SNAPSHOT=${HEIMDALL_SNAPSHOT}
     restart: unless-stopped
     stop_grace_period: 1m
     networks:
@@ -64,6 +65,7 @@ services:
       - USE_ARIA=${USE_ARIA:-true}
       - TRUSTED_NODES=${BOR_TRUSTED_NODES:-}
       - EXTRAS=${BOR_EXTRAS:-}
+      - SNAPSHOT=${BOR_SNAPSHOT}
     networks:
       default:
         aliases:
