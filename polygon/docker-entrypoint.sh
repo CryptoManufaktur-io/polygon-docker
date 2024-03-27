@@ -143,7 +143,7 @@ else
     fi
     touch /var/lib/bor/setupdone
   fi
-  if [ -d "/var/lib/bor/data/bor/chaindata" ]; then
+  if [[ "${SNAPSHOT}" =~ "bor-${NETWORK}-parts.txt" ]]; then # Imprecise, but for now assume these snapshots are leveldb hash
     __pbss=""
   else
     __pbss="--db.engine pebble --state.scheme path"
