@@ -143,10 +143,15 @@ else
     fi
     touch /var/lib/bor/setupdone
   fi
-  if [[ "${SNAPSHOT}" =~ "bor-${NETWORK}-parts.txt" ]]; then # Imprecise, but for now assume these snapshots are leveldb hash
-    __pbss=""
-  else
+  if [ ! -d "/var/lib/bor/data/bor/chaindata" ]; then # fresh sync is pebble
     __pbss="--db.engine pebble --state.scheme path"
+  else
+    # Find leveldb ldb files
+    if find "/var/lib/bor/data/bor/chaindata" -mindepth 1 -maxdepth 1 -name '*.ldb' | read; then
+      __pbss=""
+    else
+      __pbss="--db.engine pebble --state.scheme path"
+    fi
   fi
   bor dumpconfig "$@" ${__pbss} ${__verbosity} ${__bootnodes} ${EXTRAS} >/var/lib/bor/config.toml
   # Set user-supplied trusted nodes, also as static
