@@ -147,7 +147,8 @@ else
     __pbss="--db.engine pebble --state.scheme path"
   else
     # Find leveldb ldb files
-    if find "/var/lib/bor/data/bor/chaindata" -mindepth 1 -maxdepth 1 -name '*.ldb' | read; then
+    __files=$(find "/var/lib/bor/data/bor/chaindata" -mindepth 1 -maxdepth 1 -name '*.ldb')
+    if [ -n "${__files}" ]; then
       __pbss=""
     else
       __pbss="--db.engine pebble --state.scheme path"
