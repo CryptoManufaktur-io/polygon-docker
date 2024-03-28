@@ -83,12 +83,13 @@ else
       mkdir -p /var/lib/bor/snapshots
       workdir=$(pwd)
       cd /var/lib/bor/snapshots
-      if [[ "${SNAPSHOT}" =~ "bor-${NETWORK}-parts.txt" ]]; then
+      if [[ "${SNAPSHOT}" =~ ".txt" ]]; then
         # download snapshot files list
         aria2c -x6 -s6 "${SNAPSHOT}"
         set +e
+        __filename=$(basename "${SNAPSHOT}")
         # download files, includes automatic checksum verification per increment
-        aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=bor-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i bor-${NETWORK}-parts.txt
+        aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=bor-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i ${__filename}
 
         max_retries=5
         retry_count=0

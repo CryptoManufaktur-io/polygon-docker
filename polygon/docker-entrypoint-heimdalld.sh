@@ -50,12 +50,13 @@ if [ ! -f /var/lib/heimdall/setupdone ]; then
     mkdir -p /var/lib/heimdall/snapshots
     workdir=$(pwd)
     cd /var/lib/heimdall/snapshots
-    if [[ "${SNAPSHOT}" =~ "heimdall-${NETWORK}-parts.txt" ]]; then
+    if [[ "${SNAPSHOT}" =~ ".txt" ]]; then
       # download snapshot files list
       aria2c -x6 -s6 "${SNAPSHOT}"
       # download all files, includes automatic checksum verification per increment
       set +e
-      aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=heimdall-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i heimdall-${NETWORK}-parts.txt
+      __filename=$(basename "${SNAPSHOT}")
+      aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=heimdall-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i ${__filename}
 
       max_retries=5
       retry_count=0
