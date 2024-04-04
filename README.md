@@ -12,6 +12,7 @@ For a quick start, you can install prerequisites and configure Polygon Docker, a
 * `cd ~ && git clone https://github.com/CryptoManufaktur-io/polygon-docker.git && cd polygon-docker`
 * `./polygond install`
 * `cp default.env .env` and adjust network, Ethereum RPC URL, node ID, and desired version tags
+* Add `BOR_SNAPSHOT` and `HEIMDALL_SNAPSHOT` URLs to `.env`
 
 ## Initial heimdalld peering
 
