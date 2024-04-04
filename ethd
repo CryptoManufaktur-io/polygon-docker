@@ -739,7 +739,7 @@ help() {
   echo "  terminate"
   echo "     stops the ${__app_name} and destroys all data stores"
   echo "  prune-bor"
-  echo "     stops the Bor execution client and prunes its DB. This takes about 4-5 hours"
+  echo "     stops the Bor execution client and prunes its DB. This takes about 20 hours"
   echo "  help"
   echo "      print this help screen"
   echo
