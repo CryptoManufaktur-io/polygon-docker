@@ -12,7 +12,7 @@ services:
     build:
       context: ./prometheus
     image: prometheus:local
-    pull_policy: build
+    pull_policy: never
     user: root
     volumes:
       - prom-data:/prometheus
@@ -71,7 +71,7 @@ services:
     build:
       context: ./grafana
     image: grafana:local
-    pull_policy: build
+    pull_policy: never
     environment:
       - GF_SERVER_HTTP_PORT=${GRAFANA_PORT}
       - CLIENT=${COMPOSE_FILE}
