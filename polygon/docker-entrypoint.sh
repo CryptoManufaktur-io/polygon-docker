@@ -82,6 +82,7 @@ else
       mkdir -p /var/lib/bor/data/bor/chaindata
       mkdir -p /var/lib/bor/snapshots
       workdir=$(pwd)
+      __dont_rm=0
       cd /var/lib/bor/snapshots
       if [[ "${SNAPSHOT}" =~ ".txt" ]]; then
         # download snapshot files list
