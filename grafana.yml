@@ -46,6 +46,7 @@ services:
       - metrics.scrape=true
       - metrics.path=/metrics
       - metrics.port=9100
+      - metrics.network=polygon-${NETWORK}
     <<: *logging
 
   cadvisor:
@@ -64,6 +65,7 @@ services:
       - metrics.scrape=true
       - metrics.path=/metrics
       - metrics.port=8080
+      - metrics.network=polygon-${NETWORK}
     <<: *logging
 
   grafana:

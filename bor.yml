@@ -44,6 +44,7 @@ services:
       - metrics.scrape=true
       - metrics.port=26660
       - metrics.path=/metrics
+      - metrics.network=polygon-${NETWORK}
 
   bor:
     image: bor:${NETWORK}
@@ -135,6 +136,7 @@ services:
       - metrics.scrape=true
       - metrics.port=6060
       - metrics.path=/debug/metrics/prometheus
+      - metrics.network=polygon-${NETWORK}
       - traefik.enable=true
       - traefik.http.routers.${RPC_HOST:-polygon}.service=${RPC_HOST:-polygon}
       - traefik.http.routers.${RPC_HOST:-polygon}.entrypoints=websecure
