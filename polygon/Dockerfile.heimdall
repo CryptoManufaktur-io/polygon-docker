@@ -1,7 +1,7 @@
 ARG DOCKER_TAG
 
 # Get dasel
-FROM ghcr.io/tomwright/dasel:v2.5.0-alpine as dasel
+FROM ghcr.io/tomwright/dasel:2-alpine AS dasel
 
 FROM 0xpolygon/heimdall:${DOCKER_TAG}
 
