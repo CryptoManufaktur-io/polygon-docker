@@ -1,5 +1,5 @@
 # Get dasel
-FROM ghcr.io/tomwright/dasel:v2.5.0-alpine as dasel
+FROM ghcr.io/tomwright/dasel:2-alpine as dasel
 
 # Build Bor in a stock Go build container
 FROM golang:1.22-alpine as builder
