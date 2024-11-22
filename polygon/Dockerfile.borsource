@@ -5,9 +5,9 @@ FROM ghcr.io/tomwright/dasel:2-alpine AS dasel
 FROM golang:1.23-alpine AS builder
 
 # Unused, this is here to avoid build time complaints
-ARG DOCKER_TAG
+ARG DOCKER_TAG=latest
 
-ARG BUILD_TARGET
+ARG BUILD_TARGET=master
 
 RUN apk update && apk add --no-cache make gcc musl-dev linux-headers git bash
 

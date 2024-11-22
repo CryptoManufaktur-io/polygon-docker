@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile.heimdall
       args:
         - DOCKER_TAG=${HEIMDALL_TAG}
+        - DOCKER_REPO=${HEIMDALL_REPO}
     image: heimdall:${NETWORK}
     pull_policy: never
 #    tty: true
@@ -55,6 +56,7 @@ services:
       args:
         - BUILD_TARGET=${BOR_SRC_TAG}
         - DOCKER_TAG=${BOR_TAG}
+        - DOCKER_REPO=${BOR_REPO}
     restart: unless-stopped
     stop_grace_period: 3m
     user: root

@@ -1,9 +1,10 @@
-ARG DOCKER_TAG
+ARG DOCKER_TAG=latest
+ARG DOCKER_REPO=0xpolygon/bor
 
 # Get dasel
 FROM ghcr.io/tomwright/dasel:2-alpine AS dasel
 
-FROM 0xpolygon/bor:${DOCKER_TAG}
+FROM ${DOCKER_REPO}:${DOCKER_TAG}
 
 # Unused, this is here to avoid build time complaints
 ARG BUILD_TARGET

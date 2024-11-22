@@ -27,10 +27,11 @@ the command `./polygond prune-bor` is available, which prunes a long-running lev
 
 If possible, use a Pebble/PBSS snapshot.
 
-## License
+## Use with Shibarium
 
-[Apache License v2](https://github.com/CryptoManufaktur-io/polygon-docker/blob/main/LICENSE)
+This repo works on Shibarium by adjusting the `NETWORK`, `HEIMDALL_SNAPSHOT`, `HEIMDALL_SEEDS` and `BOR_BOOTNODES`
+as well as the `HEIMDALL_REPO`, `HEIMDALL_TAG` and `BOR_REPO` and `BOR_TAG` variables in `.env`.
 
 # Version
 
-This is Polygon Docker v2.3.0
+This is Polygon Docker v2.4.0

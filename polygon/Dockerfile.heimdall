@@ -1,9 +1,10 @@
-ARG DOCKER_TAG
+ARG DOCKER_TAG=latest
+ARG DOCKER_REPO=0xpolygon/heimdall
 
 # Get dasel
 FROM ghcr.io/tomwright/dasel:2-alpine AS dasel
 
-FROM 0xpolygon/heimdall:${DOCKER_TAG}
+FROM ${DOCKER_REPO}:${DOCKER_TAG}
 
 RUN apk update && apk add ca-certificates bash tzdata su-exec curl zstd lz4 pv aria2 coreutils
 
