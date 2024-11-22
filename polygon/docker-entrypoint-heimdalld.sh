@@ -49,6 +49,7 @@ if [ ! -f /var/lib/heimdall/setupdone ]; then
   if [ -n "${SNAPSHOT}" ]; then
     mkdir -p /var/lib/heimdall/snapshots
     workdir=$(pwd)
+    __dont_rm=0
     cd /var/lib/heimdall/snapshots
     if [[ "${SNAPSHOT}" =~ ".txt" ]]; then
       # download snapshot files list
