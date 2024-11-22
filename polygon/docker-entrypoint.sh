@@ -145,9 +145,7 @@ else
     fi
     touch /var/lib/bor/setupdone
   fi
-  if [ ! -d "/var/lib/bor/data/bor/chaindata" ]; then # fresh sync is pebble
-    __pbss="--db.engine pebble --state.scheme path"
-  else
+  if [ -d "/var/lib/bor/data/bor/chaindata" ]; then # determine DB type
     # Find leveldb ldb files
     __files=$(find "/var/lib/bor/data/bor/chaindata" -mindepth 1 -maxdepth 1 -name '*.ldb')
     if [ -n "${__files}" ]; then
