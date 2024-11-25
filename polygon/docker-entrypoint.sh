@@ -153,6 +153,8 @@ else
     else
       __pbss="--db.engine pebble --state.scheme path"
     fi
+  else
+    __pbss=""
   fi
   bor dumpconfig "$@" ${__pbss} ${__verbosity} ${__bootnodes} ${EXTRAS} >/var/lib/bor/config.toml
   # Set user-supplied trusted nodes, also as static
