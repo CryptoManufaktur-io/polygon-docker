@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-__project_name="polygon-docker"
+__project_name="Polygon Docker"
 __app_name="Polygon node"
 __sample_service="bor"
 __docker_exe="docker"
@@ -9,57 +9,351 @@ __compose_exe="docker compose"
 __compose_upgraded=0
 
 
-dodocker() {
+version() {
+# script version
+  grep "^This is" README.md
+  echo
+  __var="COMPOSE_FILE"
+  __get_value_from_env "${__var}" "${__env_file}" "__value"
+# Client versions
+# Adjust for your clients and how to check their version
+  case "${__value}" in
+    *bor.yml* )
+      echo "Heimdall"
+      docompose exec heimdalld heimdalld version
+      echo
+      echo "Bor"
+      docompose exec bor bor version
+      echo
+      ;;&
+    *grafana.yml* )
+      docompose exec prometheus /bin/prometheus --version
+      echo
+      echo -n "Grafana "
+      docompose exec grafana /run.sh -v
+      echo
+      ;;&
+  esac
+}
+
+
+__prep_conffiles() {
+# Create custom-prom.yml if it doesn't exist
+  if [ ! -f "./prometheus/custom-prom.yml" ]; then
+    $__as_owner touch "./prometheus/custom-prom.yml"
+  fi
+  return
+}
+
+
+__env_migrate() {
+  if [ ! -f "${__env_file}" ]; then
+    return 0
+  fi
+
+  __old_vars=( )
+  __new_vars=( )
+
+  __var=ENV_VERSION
+  __get_value_from_env "${__var}" "default.env" "__target_ver"
+  __get_value_from_env "${__var}" "${__env_file}" "__source_ver"
+
+  if [ "${__debug}" -eq 1 ]; then  # Find any values in default.env that contain dashes
+    __error=0
+    while IFS= read -r __line; do
+      # Skip blank lines and comments
+      [[ -z "${__line}" || "${__line}" =~ ^# ]] && continue
+
+      # Warn on dash-containing variable names
+      if [[ "${__line}" =~ ^([A-Za-z0-9_-]+)= ]]; then
+        __varname="${BASH_REMATCH[1]}"
+        if [[ "${__varname}" = *-* ]]; then
+          echo "❌ Error: Variable '${__varname}' contains a dash and would not be usable in Bash."
+          (( ++__error ))
+        fi
+        if [[ "${__varname}" = "ENV_VERSION" ]]; then
+          continue
+        fi
+      else
+        continue  # Doesn't match variable assignment format
+      fi
+    done < "./default.env"
+    if [ "${__error}" -gt 0 ]; then
+      exit 1
+    fi
+  fi
+
+# shellcheck disable=SC2154
+  if [[ "${__keep_targets}" -eq 1 && "${__target_ver}" -le "${__source_ver}" ]]; then # No changes in template, do nothing
+    return 0
+  fi
+
+  if [ "${__keep_targets}" -eq 0 ]; then
+    echo "Refreshing build targets in ${__env_file}"
+  fi
+  if [[ "${__target_ver}" -gt "${__source_ver}" ]]; then
+    echo "Migrating ${__env_file} to version ${__target_ver}"
+  fi
+
+  ${__as_owner} cp "${__env_file}" "${__env_file}".source
+  __during_migrate=1
+  __migrated=1
+  ${__as_owner} cp default.env "${__env_file}"
+
+  # Migrate over user settings
+  while IFS= read -r __line; do  # read default.env and process all variables in it
+    # Skip blank lines and comments
+    [[ -z "${__line}" || "${__line}" =~ ^# ]] && continue
+
+    if [[ "${__line}" =~ ^([A-Za-z0-9_-]+)= ]]; then
+      __var="${BASH_REMATCH[1]}"
+    else
+      continue  # Doesn't match variable assignment format
+    fi
+    if [[ "${__var}" = "ENV_VERSION" ]]; then
+      continue
+    fi
+
+    __get_value_from_env "${__var}" "${__env_file}.source" "__value"
+    if [ "${__found}" -eq 1 ]; then  # Only if variable isn't new in default.env
+      if [[ "${__keep_targets}" -eq 0 && "$__var" =~ (_TAG|_REPO|_TARGET|_DOCKERFILE)$ ]]; then
+        __get_value_from_env "${__var}" "default.env" "__value" # Reset build target to default.env value
+      fi
+      # Handle & gracefully, as well as multi-line
+      __update_value_in_env "${__var}" "$__value" "${__env_file}"
+    fi
+  done < "./default.env"
+
+  # Move value from old variable name(s) to new one(s)
+  for __index in "${!__old_vars[@]}"; do
+    __var=${__old_vars[__index]}
+    __get_value_from_env "${__var}" "${__env_file}.source" "__value"
+    if [ -n "${__value}" ]; then
+      __update_value_in_env "${__new_vars[__index]}" "$__value" "${__env_file}"
+    fi
+  done
+  __during_migrate=0
+}
+
+
+__dodocker() {
   $__docker_sudo $__docker_exe "$@"
 }
 
 
-docompose() {
+__docompose() {
 # I want word splitting here
 # shellcheck disable=SC2086
   $__docker_sudo $__compose_exe "$@"
 }
 
 
-determine_distro() {
-# Determine OS platform
+__get_value_from_env() {
+  # Call with variable name to read, env file name, and global variable to assign the value to
+  # Also sets global __found
+  local __var_name="$1"
+  local __env_file="$2"
+  local __output_var="$3"
+  local __output
+  local __parsed_value
+
+  if [[ "${__output_var}" == "__parsed_value" || "${__output_var}" == "__output_var" \
+      || "${__output_var}" == "__output" || "${__output_var}" == "__env_file" \
+      || "${__output_var}" == "__var_name" ]]; then
+    echo "❌ __get_value_from_env was called with a conflicting output variable: $__output_var" >&2
+    echo "This is a bug."  >&2
+    exit 1
+  fi
+
+  __output=$(awk -v var="$__var_name" '
+    BEGIN { __found = 0; __value = "" }
+
+    # Skip empty lines and comments
+    /^#|^\s*$/ {
+      next
+    }
+
+    # Match single-line unquoted value
+    $0 ~ "^[ \t]*"var"=[^\"].*$" {
+      gsub("^[ \t]*"var"=", "")
+      gsub(/^[ \t]*|[ \t]*$/, "", $0)
+      __value = $0
+      __found = 1
+      exit
+    }
+
+    # Match empty unquoted value
+    $0 ~ "^[ \t]*"var"=$" {
+       __value = ""
+       __found = 1
+       exit
+    }
+
+    # Match a quoted single-line value
+    $0 ~ "^[ \t]*"var"=\"[^\"]*\"[ \t]*$" {
+      gsub("^[ \t]*"var"=\"", "")
+      gsub(/"[ \t]*$/, "", $0)
+      __value = "\"" $0 "\""
+      __found = 1
+      exit
+    }
+
+    # Match the start of a multi-line value (with opening quote)
+    $0 ~ "^[ \t]*"var"=\"[^\"]*$" {
+      gsub("^[ \t]*"var"=\"", "")
+      __value = "\"" $0 "\n"
+      __found = 1
+      next
+    }
+
+    # Continue collecting lines for a multi-line value
+    __found && !/"[ \t]*$/ {
+      __value = __value $0 "\n"
+      next
+    }
+
+    # End of a multi-line value (with closing quote)
+    __found && /"[ \t]*$/ {
+      gsub(/[ \t]*"[ \t]*$/, "")
+      __value = __value $0 "\""
+      __found = 1
+      exit
+    }
+
+    END {
+      # Print here-doc style so we can parse with awk
+      # Print the value as is, including quotes for multi-line
+      print "__value<<EOF"
+      print __value
+      print "EOF"
+      print "__found=" __found
+    }
+  ' "$__env_file")
+
+  # Parse __value using here-doc style
+  __parsed_value=$(awk '/^__value<<EOF$/ {getline; while ($0 != "EOF") { print; getline } }' <<< "$__output")
+  # Parse __found directly into a global variable
+  __found=$(awk -F= '/^__found=/ {print $2}' <<< "$__output")
+
+  # assign value to caller’s variable
+  printf -v "$__output_var" '%s' "$__parsed_value"
+}
+
+
+__update_value_in_env() {
+# Call as __update_value_in_env "$__var" "$__value" "$__env_file"
+  local __var_name="$1"
+  local __new_value="$2"
+  local __env_file="$3"
+
+  # Escape backslashes for safety
+  local __escaped_value
+  __escaped_value=$(printf '%s' "${__new_value}" | sed 's/\\/\\\\/g')
+
+  # Check if the variable already exists in the .env file
+  if grep -q "^[ \t]*${__var_name}=" "${__env_file}"; then
+    # Variable exists, update it
+    awk -v var="${__var_name}" -v new_value="${__escaped_value}" '
+      BEGIN { in_block = 0; multi_line = 0 }
+
+      # Match the line that starts with the variable name
+      $0 ~ "^[ \t]*" var "=" {
+        # If the value starts with a quote, it may be a multi-line
+        if ($0 ~ "^[ \t]*" var "=\"") {
+          # Start of multi-line value
+          multi_line = 1
+          # Print the variable name with the new value, replacing & safely
+          gsub(/&/, "\\&", new_value)
+          print var "=" new_value
+        } else {
+          # Single-line value
+          gsub(/&/, "\\&", new_value)
+          print var "=" new_value
+        }
+        # Set the flag to indicate we are processing the target variable block
+        in_block = 1
+        next
+      }
+
+      # If we encounter a new variable definition, stop skipping lines
+      /^[A-Z_][A-Z0-9_]*=/ && in_block {
+        in_block = 0
+        multi_line = 0
+      }
+      # Continue to skip lines in a multi-line block if multi_line is true
+      multi_line && !/"[ \t]*$/ {
+        next
+      }
+
+      # If we reach the end of a multi-line value, reset flags
+      multi_line && /"[ \t]*$/ {
+        in_block = 0
+        multi_line = 0
+        next
+      }
+
+      # Print all lines if not in the target variable block
+      { print }
+    ' "${__env_file}" | ${__as_owner} tee "${__env_file}.tmp" >/dev/null
+    ${__as_owner} mv "${__env_file}.tmp" "${__env_file}"
+  else
+    # Variable does not exist, append it
+    printf "%s=%s\n" "${__var_name}" "${__escaped_value}" | ${__as_owner} tee -a "${__env_file}" >/dev/null
+  fi
+}
+
+
+__determine_distro() {
+  # Determine OS platform
   __uname=$(uname | tr "[:upper:]" "[:lower:]")
-# If Linux, try to determine specific distribution
+  # If Linux, try to determine specific distribution
   if [ "$__uname" == "linux" ]; then
-# If available, use LSB to identify distribution
+    # If available, use LSB to identify distribution
     if [ -n "$(which lsb_release 2>/dev/null)" ]; then
       __distro=$(lsb_release -i | cut -d: -f2 | sed s/'^\t'//)
-# Otherwise, use release info file
+    # Otherwise, use release info file
     else
       __distro=$(find /etc -maxdepth 1 -type f -name '[A-Za-z]*[_-][rv]e[lr]*' | grep -v "lsb" | cut -d'/' -f3 | cut -d'-' -f1 | cut -d'_' -f1)
     fi
   else
     __distro=""
   fi
-# For everything else (or if above failed), just use generic identifier
+  # For everything else (or if above failed), just use generic identifier
   [ "$__distro" == "" ] && __distro=$__uname
   unset __uname
   __distro=$(echo "$__distro" | tr "[:upper:]" "[:lower:]")
 
   if [[ "$__distro" = "ubuntu" ]]; then
-    if ! dpkg-query -W -f='${Status}' lsb-release 2>/dev/null | grep -q "ok installed"; then
-      ${__auto_sudo} apt-get update && ${__auto_sudo} apt-get -y install lsb-release
+    if [ "$__cannot_sudo" -eq 0 ]; then
+      if ! dpkg-query -W -f='${Status}' lsb-release 2>/dev/null | grep -q "ok installed"; then
+        ${__auto_sudo} apt-get update && ${__auto_sudo} apt-get -y install lsb-release
+      fi
     fi
-    __os_major_version=$(lsb_release -r | cut -d: -f2 | sed s/'^\t'// | cut -d. -f1)
+    if [ -n "$(command -v lsb_release 2>/dev/null)" ]; then
+      __os_major_version=$(lsb_release -r | cut -d: -f2 | sed s/'^\t'// | cut -d. -f1)
+    else
+      __os_major_version=24 # Without sudo and lsb_release let's just skip the check
+    fi
   elif [[ "$__distro" =~ "debian" ]]; then
-    if ! dpkg-query -W -f='${Status}' lsb-release 2>/dev/null | grep -q "ok installed"; then
-      ${__auto_sudo} apt-get update && ${__auto_sudo} apt-get -y install lsb-release
+    if [ "$__cannot_sudo" -eq 0 ]; then
+      if ! dpkg-query -W -f='${Status}' lsb-release 2>/dev/null | grep -q "ok installed"; then
+        ${__auto_sudo} apt-get update && ${__auto_sudo} apt-get -y install lsb-release
+      fi
     fi
-    __os_major_version=$(lsb_release -r | cut -f2)
+    if [ -n "$(command -v lsb_release 2>/dev/null)" ]; then
+      __os_major_version=$(lsb_release -r | cut -f2)
+    else
+      __os_major_version=12 # Without sudo and lsb_release let's just skip the check
+    fi
   fi
 }
 
 
-handle_docker_sudo() {
-  if [[ "$__distro" =~ "debian" || "$__distro" = "ubuntu" ]]; then
+__handle_docker_sudo() {
+  if [[ "$__distro" =~ "debian" || "$__distro" = "ubuntu" ]] && ! grep -qi microsoft /proc/version; then
     systemctl status docker >/dev/null
-    result=$?
-    if [ ! "${result}" -eq 0 ]; then
+    __result=$?
+    if [ ! "${__result}" -eq 0 ]; then
       echo "The Docker daemon is not running. Please check Docker installation."
       echo "\"sudo systemctl status docker\" and \"sudo journalctl -fu docker\" will be helpful."
       echo "Aborting."
@@ -67,26 +361,45 @@ handle_docker_sudo() {
     fi
   fi
 
+  __docker_version=$(docker --version | awk '{ gsub(/,/, "", $3); print $3 }')
+  __docker_major_version=$(docker --version | awk '{ split($3, version, "."); print version[1]; }')
+  if [ "${__docker_major_version}" -lt 23 ]; then
+    __old_docker=1
+    echo "Docker ${__docker_version} detected"
+  else
+    __old_docker=0
+  fi
+
   __docker_sudo=""
   if ! docker images >/dev/null 2>&1; then
+    if [ "$__cannot_sudo" -eq 1 ]; then
+      echo "Cannot call Docker and cannot use sudo. Please make your user part of the docker group"
+      exit 1
+    fi
     echo "Will use sudo to access Docker"
     __docker_sudo="sudo"
   fi
 }
 
 
-handle_root() {
+__handle_root() {
+  __cannot_sudo=0
   if [ "${EUID}" -eq 0 ]; then
     __as_owner="sudo -u ${OWNER}"
     __auto_sudo=""
   else
     __as_owner=""
-    __auto_sudo="sudo"
+    if groups | grep -q '\bsudo\b' || groups | grep -q '\badmin\b'; then
+      __auto_sudo="sudo"
+    else
+      __auto_sudo=""
+      __cannot_sudo=1
+    fi
   fi
 }
 
 
-check_compose_version() {
+__check_compose_version() {
 # Check for Compose V2 (docker compose) vs Compose V1 (docker-compose)
   if docker compose version >/dev/null 2>&1; then
     __old_compose=0
@@ -100,10 +413,10 @@ check_compose_version() {
       echo
       echo "It is recommended that you replace Compose V1 with Compose V2."
       while true; do
-        read -rp "Do you want to update Docker Compose to V2? (yes/no) " yn
-        case $yn in
+        read -rp "Do you want to update Docker Compose to V2? (yes/no) " __yn
+        case $__yn in
           [Nn]* ) echo "Please be sure to update Docker Compose yourself!"; break;;
-           * ) upgrade_compose; break;;
+           * ) __upgrade_compose; break;;
         esac
       done
     fi
@@ -111,16 +424,16 @@ check_compose_version() {
 }
 
 
-upgrade_compose() {
+__upgrade_compose() {
   if ! type -P docker-compose >/dev/null 2>&1; then
     echo "Docker Compose has already been updated to V2"
     return
   fi
   echo "Updating Docker Compose to V2"
   if [[ "$__distro" = "ubuntu" ]]; then
-    if [ "${__os_major_version}" -lt 20 ]; then
+    if [ "${__os_major_version}" -lt 22 ]; then
       echo "${__project_name} cannot update Docker Compose on Ubuntu ${__os_major_version}."
-      echo "Consider upgrading to 20.04 and then 22.04."
+      echo "Consider upgrading to 22.04 and then 24.04."
       exit 1
     fi
     if dpkg-query -W -f='${Status}' docker.io 2>/dev/null | grep -q "ok installed"; then
@@ -137,9 +450,9 @@ upgrade_compose() {
     __compose_upgraded=1
   elif [[ "$__distro" =~ "debian" ]]; then
     ${__auto_sudo} apt-get update && ${__auto_sudo} apt-get -y install ca-certificates curl gnupg
-    if [ "${__os_major_version}" -lt 10 ]; then
+    if [ "${__os_major_version}" -lt 11 ]; then
       echo "${__project_name} cannot update Docker Compose on Debian ${__os_major_version}."
-      echo "Consider upgrading to 10, then 11 and then 12."
+      echo "Consider upgrading to 11 and then 12."
       exit 1
     fi
     if dpkg-query -W -f='${Status}' docker.io 2>/dev/null | grep -q "ok installed"; then
@@ -165,15 +478,7 @@ upgrade_compose() {
 }
 
 
-prep_prometheus() {
-# Create custom-prom.yml if it doesn't exist
-  if [ ! -f "./prometheus/custom-prom.yml" ]; then
-    $__as_owner touch "./prometheus/custom-prom.yml"
-  fi
-}
-
-
-check_for_snap() {
+__check_for_snap() {
   if [[ "$__distro" = "ubuntu" && -n "$(which snap)" ]] && snap list 2>/dev/null | grep -qw 'docker'; then
     echo
     echo "WARNING! Snap Docker package detected. This WILL result in issues."
@@ -194,18 +499,22 @@ check_for_snap() {
 
 
 install() {
-  check_for_snap
+  if [ "$__cannot_sudo" -eq 1 ]; then
+    echo "The install command requires the user to be part of the sudo group, or on macOS the admin group"
+    exit 1
+  fi
+
   while true; do
-    read -rp "This will attempt to install Docker and make your user part of the docker group. Do you wish to continue? (no/yes) " yn
-    case $yn in
+    read -rp "This will attempt to install Docker and make your user part of the docker group. Do you wish to continue? (no/yes) " __yn
+    case $__yn in
       [Yy]* ) break;;
       * ) echo "Aborting, no changes made"; exit 130;;
     esac
   done
   if [[ "$__distro" = "ubuntu" ]]; then
-    if [ "${__os_major_version}" -lt 20 ]; then
+    if [ "${__os_major_version}" -lt 22 ]; then
       echo "${__project_name} cannot install Docker on Ubuntu ${__os_major_version}."
-      echo "Consider upgrading to 20.04 and then 22.04."
+      echo "Consider upgrading to 22.04 and then 24.04."
       exit 1
     fi
     if [ -z "$(which docker)" ]; then
@@ -235,9 +544,9 @@ install() {
     if [ -z "$(which docker)" ]; then
       ${__auto_sudo} apt-get update
       ${__auto_sudo} apt-get -y install ca-certificates curl gnupg chrony pkg-config
-      if [ "${__os_major_version}" -lt 10 ]; then
+      if [ "${__os_major_version}" -lt 11 ]; then
         echo "${__project_name} cannot install Docker on Debian ${__os_major_version}."
-        echo "Consider upgrading to 10, then 11 and then 12."
+        echo "Consider upgrading to 11 and then 12."
         exit 1
       fi
       ${__auto_sudo} mkdir -p /etc/apt/keyrings
@@ -268,66 +577,125 @@ install() {
 }
 
 
-# Warn user if space is low, so they can prune
-check_disk_space() {
-  __docker_dir=$(dodocker system info --format '{{.DockerRootDir}}')
-  __free_space=$(df -P "${__docker_dir}" | awk '/[0-9]%/{print $(NF-2)}')
-
-  re='^[0-9]+$'
-  if ! [[ "${__free_space}" =~ $re ]] ; then
-    echo "Unable to determine free disk space. This is likely a bug."
-    echo "df reports $(df -P "${__docker_dir}") and __free_space is ${__free_space}"
-    exit 70
+__get_docker_free_space() { # set __free_space to what's available to Docker
+  if [[ "$OSTYPE" == "darwin"* ]]; then # macOS doesn't expose docker root dir to the OS
+    __free_space=$(__dodocker run --rm -v macos-space-check:/dummy busybox df -P /dummy | awk '/[0-9]%/{print $(NF-2)}')
+  else
+    __docker_dir=$(__dodocker system info --format '{{.DockerRootDir}}')
+    __free_space=$(df -P "${__docker_dir}" | awk '/[0-9]%/{print $(NF-2)}')
   fi
 
-  var="COMPOSE_FILE"
-  value=$(sed -n -e "s/^${var}=\(.*\)/\1/p" ".env" || true)
-
-# Literal match intended
-# shellcheck disable=SC2076
-  if [[ "${value}" =~ "bor.yml" ]] && [[ "${__free_space}" -lt 104857600 ]]; then
-    echo
-    echo "You are running bor and have less than 100 GiB of free disk space."
-    echo "If Avail reads 40 GiB or more, prune with ./ethd prune-bor:"
-    echo
-    df -h "${__docker_dir}"
-    echo
-    echo "If it's less than 40 GiB, you may need to resync Bor from scratch."
-    echo
-  elif [[ "${__free_space}" -lt 52428800 ]]; then
-    echo
-    echo "You have less than 50 GiB of free disk space:"
-    echo
-    df -h "${__docker_dir}"
-    echo
-    echo "Pruning does not appear an option for your client mix."
-    echo
+  __regex='^[0-9]+$'
+  if ! [[ "${__free_space}" =~ $__regex ]] ; then
+    echo "Unable to determine free disk space. This is likely a bug."
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+      echo "df reports $(__dodocker run --rm -v macos-space-check:/dummy busybox df -P /dummy) and __free_space is ${__free_space}"
+    else
+      echo "df reports $(df -P "${__docker_dir}") and __free_space is ${__free_space}"
+    fi
+    exit 70
   fi
 }
 
 
-nag_os_version() {
-  if [[ "$__distro" = "ubuntu" ]]; then
-    if [ "${__os_major_version}" -lt 20 ]; then
-      echo
-      echo "Ubuntu ${__os_major_version} is older than the recommended 22.04 or 20.04 version."
-      echo
-    fi
+__display_docker_dir() {
+  if [[ "$OSTYPE" == "darwin"* ]]; then # macOS doesn't expose docker root dir to the OS
+    echo "Here's total and used space on Docker's virtual volume"
+    __dodocker run --rm -v macos-space-check:/dummy busybox df -h /dummy
+  else
+    echo "Here's total and used space on ${__docker_dir}"
+    df -h "${__docker_dir}"
   fi
+}
 
-  if [[ "$__distro" =~ "debian" ]]; then
-    if [ "${__os_major_version}" -lt 10 ]; then
+
+__display_docker_volumes() {
+  echo
+  if [ -z "$(__dodocker volume ls -q -f "name=^$(basename "$(realpath .)")_[^_]+")" ]; then
+    echo "There are no Docker volumes for this copy of ${__project_name}"
+    echo
+  else
+    echo "Here are the Docker volumes used by this copy of ${__project_name} and their space usage:"
+    __dodocker system df -v | grep -A 500 "VOLUME NAME" | grep "^$(basename "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")"
+    echo
+  fi
+  echo "If there is some mystery space being taken up, try \"sudo ncdu /\"."
+  echo
+}
+
+
+space() {
+  __get_docker_free_space
+  echo
+  if [[ "$OSTYPE" == "darwin"* ]]; then # macOS doesn't expose docker root dir to the OS
+    echo "You have $(( __free_space / 1024 / 1024 )) GiB free for Docker volumes"
+  else
+    echo "You have $(( __free_space / 1024 / 1024 )) GiB free on ${__docker_dir}"
+  fi
+  echo
+  __display_docker_dir
+  __display_docker_volumes
+}
+
+
+# Warn user if space is low, so they can prune
+__check_disk_space() {
+  __get_docker_free_space
+
+  if [[ "${__free_space}" -lt 52428800 ]]; then
+    echo
+    echo "You have less than 50 GiB of free disk space:"
+    echo
+    __display_docker_dir
+    echo
+    echo "Pruning does not appear an option for your client mix."
+    echo "If total space is less than 1.8 TiB, consider cloning to a larger drive."
+    __display_docker_volumes
+  fi
+}
+
+
+__nag_os_version() {
+  if [[ "$__distro" = "ubuntu" ]]; then
+    if [ "${__os_major_version}" -lt 22 ]; then
       echo
-      echo "Debian ${__os_major_version} is older than the recommended 10, 11 or 12 version."
+      echo "Ubuntu ${__os_major_version} is older than the recommended 24.04 or 22.04 version."
       echo
+      echo "Updating is neither urgent nor required, merely recommended."
+    fi
+  elif [[ "$__distro" =~ "debian" ]]; then
+    if [ "${__os_major_version}" -lt 11 ]; then
+      echo
+      echo "Debian ${__os_major_version} is older than the recommended 12 or 11 version."
+      echo
+      echo "Updating is neither urgent nor required, merely recommended."
     fi
   fi
+}
+
+
+__pull_and_build() {
+  __dodocker system prune --force
+  __docompose --profile tools pull
+  __docompose --profile tools build --pull
 }
 
 
 # Arguments are passed, but shellcheck doesn't recognize that
 # shellcheck disable=SC2120
 update() {
+# Only one copy of update() should run per stack
+  local __script_dir
+  __script_dir="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+  local __uniq_id="${__script_dir//\//_}"
+  local __lock_file="${__uniq_id}_lock"
+  ${__as_owner} touch "/tmp/${__lock_file}"
+  exec 200<"/tmp/${__lock_file}"
+  if ! flock -n 200; then
+    echo "Another instance of \"${__me} update\" is running. Aborting."
+    exit 1
+  fi
+
   __during_update=1
   if [[ $(${__as_owner} git status --porcelain) ]]; then
     __dirty=1
@@ -337,8 +705,8 @@ update() {
 
   __free_space=$(df -P "$(pwd)" | awk '/[0-9]%/{print $(NF-2)}')
 
-  re='^[0-9]+$'
-  if ! [[ "${__free_space}" =~ $re ]] ; then
+  __regex='^[0-9]+$'
+  if ! [[ "${__free_space}" =~ $__regex ]] ; then
     echo "Unable to determine free disk space. This is likely a bug."
     echo "df reports $(df -P "$(pwd)") and __free_space is ${__free_space}"
     exit 70
@@ -348,38 +716,29 @@ update() {
     exit 1
   fi
 
-  __docker_dir=$(dodocker system info --format '{{.DockerRootDir}}')
-  __free_space=$(df -P "${__docker_dir}" | awk '/[0-9]%/{print $(NF-2)}')
-
-  re='^[0-9]+$'
-  if ! [[ "${__free_space}" =~ $re ]] ; then
-    echo "Unable to determine free disk space. This is likely a bug."
-    echo "df reports $(df -P "${__docker_dir}") and __free_space is ${__free_space}"
-    exit 70
-  elif [ "${__free_space}" -lt 1048576 ]; then
-    echo "You have less than 1 GiB of space left on ${__docker_dir}."
+  __get_docker_free_space
+  if [ "${__free_space}" -lt 1048576 ]; then
+    echo "You have less than 1 GiB of space left for Docker volumes."
     echo "Aborting, as an update is not safe."
     exit 1
   fi
 
   if [ -z "${ETHDSECUNDO-}" ]; then
-    # Do not track changes to ext-network.yml
     set +e
-    ${__as_owner} git update-index --assume-unchanged ext-network.yml
     ${__as_owner} git config pull.rebase false
-    var="SCRIPT_TAG"
-    value=$(sed -n -e "s/^${var}=\(.*\)/\1/p" "${ENV_FILE}" || true)
-    if [ -z "${value}" ] || [ "${value}" = "latest" ]; then
+    __var="SCRIPT_TAG"
+    __get_value_from_env "${__var}" "${__env_file}" "__value"
+    if [ -z "${__value}" ] || [ "${__value}" = "latest" ]; then
       export ETHDPINNED=""
       __branch=$(git rev-parse --abbrev-ref HEAD)
-      if [[ "${__branch}" =~ ^tag-v[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      if [[ "${__branch}" =~ ^tag-* ]]; then
         git checkout main
       fi
       ${__as_owner} git pull
     else
-      export ETHDPINNED="${value}"
+      export ETHDPINNED="${__value}"
       ${__as_owner} git fetch --tags
-      ${__as_owner} git checkout -B "tag-${value}" "tags/${value}"
+      ${__as_owner} git checkout -B "tag-${__value}" "tags/${__value}"
     fi
     export GITEXITCODE=$?
     set -e
@@ -389,25 +748,52 @@ update() {
     exec "${BASH_SOURCE[0]}" update "$@"
   fi
 
-  envmigrate
+  __keep_targets=1
+  __debug=0
+  while :
+  do
+    if [ -z "${1+x}" ]; then
+      break
+    fi
+    case "$1" in
+      --refresh-targets | --reset-targets)
+        __keep_targets=0
+        shift
+        ;;
+      --non-interactive)
+        __non_interactive=1
+        shift
+        ;;
+      --debug)
+        __debug=1
+        shift
+        ;;
+      *)
+        echo "Error: Unknown option: $1" >&2
+        shift
+        ;;
+    esac
+  done
+  if [ "${ETHD_FRONTEND:-}" = "noninteractive" ]; then
+    __non_interactive=1
+  fi
 
-  dodocker system prune --force
-  docompose --profile tools pull
-  docompose --profile tools build --pull
+  __env_migrate
+  __pull_and_build
 
-  if [ "${__migrated}" -eq 1 ] && ! cmp -s "${ENV_FILE}" "${ENV_FILE}".source; then
-    cp "${ENV_FILE}".source "${ENV_FILE}".bak
-    rm "${ENV_FILE}".source
-    echo "Your ${ENV_FILE} configuration settings have been migrated to a fresh copy. You can \
-find the original contents in ${ENV_FILE}.bak."
+  if [ "${__migrated}" -eq 1 ] && ! cmp -s "${__env_file}" "${__env_file}".source; then
+    cp "${__env_file}".source "${__env_file}".bak
+    rm "${__env_file}".source
+    echo "Your ${__env_file} configuration settings have been migrated to a fresh copy. You can \
+find the original contents in ${__env_file}.bak."
     echo
-    echo "List of changes made to ${ENV_FILE} during migration - current on left, original on right:"
+    echo "List of changes made to ${__env_file} during migration - current on left, original on right:"
     echo
-    diff -y --suppress-common-lines "${ENV_FILE}" "${ENV_FILE}".bak || true
+    diff -y --suppress-common-lines "${__env_file}" "${__env_file}".bak || true
   else
-    echo "No changes made to ${ENV_FILE} during update"
-    if [ -f "${ENV_FILE}".source ]; then
-      ${__as_owner} rm "${ENV_FILE}".source || true
+    echo "No changes made to ${__env_file} during update"
+    if [ -f "${__env_file}".source ]; then
+      ${__as_owner} rm "${__env_file}".source || true
     fi
   fi
   echo
@@ -423,11 +809,10 @@ find the original contents in ${ENV_FILE}.bak."
     echo "The current partial update risks startup failure."
   fi
 
-  nag_os_version
+  __nag_os_version
 
   unset ETHDSECUNDO
   unset GITEXITCODE
-  check_for_snap
   if [ "${__dirty}" -eq 1 ]; then
     echo
     echo "WARNING"
@@ -442,151 +827,10 @@ find the original contents in ${ENV_FILE}.bak."
     echo "${__project_name} version is pinned to ${ETHDPINNED} in \".env\"."
     echo "Please make sure to run compatible client versions."
   fi
+# Release lock and remove lock file
+  exec 200<&-
+  ${__as_owner} rm -f "/tmp/${__lock_file}"
   __during_update=0
-}
-
-
-envmigrate() {
-  if [ ! -f "./${ENV_FILE}" ]; then
-    return
-  fi
-
-  ALL_VARS=( COMPOSE_FILE BOR_NODE_ID NETWORK HEIMDALL_ETH_RPC_URL HEIMDALL_TAG BOR_TAG BOR_SRC_TAG BOR_DOCKER_FILE \
-  BOR_CACHE HEIMDALL_SNAPSHOT_FILE BOR_FULL_NODE_SNAPSHOT_FILE LOG_LEVEL DOMAIN ACME_EMAIL TX_LOCAL_ADDR \
-  BOR_TRUSTED_NODES CF_DNS_API_TOKEN CF_ZONE_API_TOKEN CF_ZONE_ID AWS_PROFILE AWS_HOSTED_ZONE_ID GRAFANA_HOST \
-  RPC_HOST RPC_LB WS_HOST WS_LB DDNS_SUBDOMAIN DDNS_PROXY HEIMDALL_SEEDS HEIMDALL_BOR_RPC_URL BOR_BOOTNODES \
-  HEIMDALL_P2P_PORT BOR_P2P_PORT BOR_RPC_PORT BOR_WS_PORT TRAEFIK_WEB_HTTP_PORT TRAEFIK_WEB_PORT GRAFANA_PORT \
-  HEIMDALL_RPC_PORT NODE_EXPORTER_IGNORE_MOUNT_REGEX BOR_EXTRAS BOR_SNAPSHOT HEIMDALL_SNAPSHOT BOR_REPO \
-  HEIMDALL_REPO HEIMDALL_PEERS )
-  OLD_VARS=( )
-  NEW_VARS=( )
-
-  var=ENV_VERSION
-  __target_ver=$(sed -n -e "s/^${var}=\(.*\)/\1/p" "default.env" || true)
-  __source_ver=$(sed -n -e "s/^${var}=\(.*\)/\1/p" "${ENV_FILE}" || true)
-
-  if [[ "${__target_ver}" = "${__source_ver}" ]]; then # No changes in template, do nothing
-    return 0
-  fi
-
-  echo "Migrating ${ENV_FILE} to version ${__target_ver}"
-  ${__as_owner} cp "${ENV_FILE}" "${ENV_FILE}".source
-  __during_migrate=1
-  __migrated=1
-  ${__as_owner} cp default.env "${ENV_FILE}"
-  # Migrate over user settings
-  for var in "${ALL_VARS[@]}"; do
-    value=$(sed -n -e "s/^${var}=\(.*\)/\1/p" "${ENV_FILE}.source" || true)
-# Adjust for vars that are possibly empty
-    if [ -n "${value}" ] || [ "${var}" = "BOR_SNAPSHOT" ] || [ "${var}" = "HEIMDALL_SNAPSHOT" ]; then
-      sed -i'.original' -e "s~^\(${var}\s*=\s*\).*$~\1${value}~" "${ENV_FILE}"
-    fi
-  done
-  # Move value from old variable name(s) to new one(s)
-  for index in "${!OLD_VARS[@]}"; do
-    var=${OLD_VARS[index]}
-    value=$(sed -n -e "s/^${var}=\(.*\)/\1/p" "${ENV_FILE}.source" || true)
-    if [ -n "${value}" ]; then
-        sed -i'.original' -e "s~^\(${NEW_VARS[index]}\s*=\s*\).*$~\1${value}~" "${ENV_FILE}"
-    fi
-  done
-  rm "${ENV_FILE}".original
-  __during_migrate=0
-}
-
-
-prune-bor() {
-  __non_interactive=0
-  while :
-  do
-    if [ -z ${1+x} ]; then
-      break
-    fi
-    case "$1" in
-      --non-interactive)
-        __non_interactive=1
-        shift
-        ;;
-      *)
-        echo "Error: Unknown option: $1" >&2
-        exit 1
-        ;;
-    esac
-  done
-
-  if [ ! -f "./${ENV_FILE}" ]; then
-    echo "${ENV_FILE} configuration file not found, aborting."
-    exit 1
-  fi
-
-  if ! grep -q '^COMPOSE_FILE=.*bor\.yml' "${ENV_FILE}" 2>/dev/null ; then
-    echo "You do not appear to be using Bor, aborting."
-    exit 1
-  fi
-
-  if [ "$(df -P /var/lib/docker | awk '/[0-9]%/{print $(NF-2)}')" -lt 41943040 ]; then
-    echo "You do not have enough free disk space. Make sure this reads at least 40G free (Avail):"
-    df -h /var/lib/docker
-    echo ""
-    echo "Aborting."
-    exit 1
-  fi
-
-  rpc_port=8545
-  sync_status=$(cmd exec -T bor wget -qO- "http://localhost:$rpc_port" --header 'Content-Type: application/json' --post-data '{"jsonrpc":"2.0","method":"eth_syncing","params":[],"id":1}')
-  exitstatus=$?
-  if [ $exitstatus -ne 0 ]; then
-    echo "Bor is not running, aborting."
-    exit 1
-  fi
-
-  if [[ ! "${sync_status}" =~ "false" ]]; then
-    echo "Bor is not done syncing yet. Sync status:"
-    echo "${sync_status}"
-    echo ""
-    echo "Aborting."
-    exit 1
-  fi
-  node_logs=$(cmd logs --no-color --tail 1000 bor)
-  if [[ "${node_logs}" =~ "snapshot generation" && ! "${node_logs}" =~ "Generated state" ]]; then
-    echo "Bor has not finished generating a state snapshot yet, aborting."
-    exit 1
-  fi
-
-  regex='\[([0-9][0-9]-[0-9][0-9])\|([0-9][0-9]:[0-9][0-9]):[0-9.]*\][[:space:]]*Generated state'
-  if [[ "${node_logs}" =~ $regex ]]; then
-    snap_time=$(date -d "1970-${BASH_REMATCH[1]} ${BASH_REMATCH[2]}" +"%s")
-    now_time=$(date +"%s")
-    if [ $((snap_time+2100)) -gt "$now_time" ]; then
-      echo "Please wait 35 minutes after snapshot generation finished. Aborting."
-      exit 1
-    fi
-  fi
-
-  if [ $__non_interactive = 0 ]; then
-    while true; do
-      read -rp "WARNING - this will stop Bor and prune its database. Do you wish to continue? (No/Yes) " yn
-      case $yn in
-        [Yy]es ) break;;
-        * ) echo "Aborting, no changes made"; exit 1;;
-      esac
-    done
-  fi
-
-  echo
-  echo "Starting Bor prune"
-  echo
-  cmd run --rm set-prune-marker "touch /var/lib/bor/prune-marker"
-  cmd stop bor && cmd rm -f bor
-  start
-  echo
-  echo "Prune is running, you can observe it with './ethd logs -f bor'"
-  echo
-  echo "There should be three stages: \"Iterating state snapshot\", \"Pruning state data\", and \"Compacting database\". During \
-the \"Compacting database\" stage it may not output logs for an hour or so, that is normal."
-  echo
-  echo "When prune is done, which may take ~17-20 hours, Bor will automatically start again."
-  echo
 }
 
 
@@ -596,7 +840,7 @@ upgrade() {
 
 
 start() {
-  docompose up -d --remove-orphans "$@"
+  __docompose up -d --remove-orphans "$@"
 }
 
 
@@ -611,7 +855,7 @@ run() {
 
 
 stop() {
-  docompose down --remove-orphans "$@"
+  __docompose down --remove-orphans "$@"
 }
 
 
@@ -629,25 +873,25 @@ restart() {
 
 
 logs() {
-  docompose logs "$@"
+  __docompose logs "$@"
 }
 
 
 cmd() {
-  docompose "$@"
+  __docompose "$@"
 }
 
 
 terminate() {
-  if [ -z "$(dodocker volume ls -q -f "name=^$(basename "$(realpath .)")_[^_]+")" ]; then
+  if [ -z "$(__dodocker volume ls -q -f "name=^$(basename "$(realpath .)")_.+")" ]; then
     echo "There are no data stores - Docker volumes - left to remove for this ${__app_name}."
     stop
     exit 0
   fi
 
   while true; do
-    read -rp "WARNING - this action will destroy all data stores for this ${__app_name}. Do you wish to continue? (No/Yes) " yn
-    case $yn in
+    read -rp "WARNING - this action will destroy all data stores for this ${__app_name}. Do you wish to continue? (No/Yes) " __yn
+    case $__yn in
       [Yy]es ) break;;
       * ) echo "Aborting, no changes made"; exit 130;;
     esac
@@ -656,130 +900,121 @@ terminate() {
   down
 # In this case I want the word splitting, so rm can remove all volumes
 # shellcheck disable=SC2046
-  dodocker volume rm $(dodocker volume ls -q -f "name=^$(basename "$(realpath .)")_[^_]+")
+  __dodocker volume rm $(__dodocker volume ls -q -f "name=^$(basename "$(realpath .)")_.+")
   echo
   echo "All containers stopped and all volumes deleted"
   echo
 }
 
 
-handle_error() {
+__handle_error() {
   if [[ ! $- =~ e ]]; then
 # set +e, do nothing
     return 0
   fi
 
-  local exit_code=$1
-  local line_no=$2
-  if [ "$exit_code" -eq 130 ]; then
+  local __exit_code=$1
+  local __line_no=$2
+  if [ "$__exit_code" -eq 130 ]; then
     echo "$__me terminated by user"
   else
-    echo "$__me terminated with exit code $exit_code on line $line_no"
+    echo "$__me terminated with exit code $__exit_code on line $__line_no"
     if [ -n "${__command}" ]; then
       echo "This happened during $__me ${__command} ${__params}"
     fi
   fi
   if [ "$__during_update" -eq 1 ] && [ "$__during_migrate" -eq 1 ]; then
-    cp "${ENV_FILE}" "${ENV_FILE}".partial
-    cp "${ENV_FILE}".source "${ENV_FILE}"
+    cp "${__env_file}" "${__env_file}".partial
+    cp "${__env_file}".source "${__env_file}"
     echo
-    echo "Restored your ${ENV_FILE} file, to undo partial migration. Please verify it looks correct."
-    echo "The partially migrated file is in ${ENV_FILE}.partial for troubleshooting."
+    echo "Restored your ${__env_file} file, to undo partial migration. Please verify it looks correct."
+    echo "The partially migrated file is in ${__env_file}.partial for troubleshooting."
   fi
 }
 
 
-version() {
-  # ethd version
-  grep "^This is" README.md
-  echo ""
-  var="COMPOSE_FILE"
-  value=$(sed -n -e "s/^${var}=\(.*\)/\1/p" ".env" || true)
-  # Client versions
-  case "${value}" in
-    *bor.yml* )
-      echo "Heimdall"
-      docompose exec heimdalld heimdalld version
-      echo
-      echo "Bor"
-      docompose exec bor bor version
-      echo
-      ;;&
-    *grafana.yml* )
-      docompose exec prometheus /bin/prometheus --version
-      echo
-      echo -n "Grafana "
-      docompose exec grafana /run.sh -v
-      echo
-      ;;&
-  esac
+__update_help() {
+  echo "usage: $__me update [--refresh-targets] [--non-interactive] [--debug]"
+  echo
+  echo "Updates Eth Docker itself, as required the contents of \".env\", and the clients."
+  echo
+  echo "A combination of \"git pull\" for Eth Docker, some bash scripting to bring new variables from \"default.env\","
+  echo "and \"docker compose pull\" as well as \"docker compose build\" for the clients."
+  echo
+  echo "If warranted, will also offer resync when clients require it, or upgrade of PostgreSQL version."
+  echo
+  echo "\"--refresh-targets\" sets Docker tags, source targets, and repos of clients back to the defaults in \"default.env\"."
+  echo "\"--non-interactive\" does not ask questions and assumes Yes for database resyncs and migrations."
+  echo "\"--debug\" handles some CI sanity checks."
+  echo
 }
 
 
-help() {
+__full_help() {
   echo "usage: ${__me} [-h|--help] <command>"
   echo
   echo "commands:"
   echo "  install"
-  echo "     attempts to install Docker and Docker Compose for you"
+  echo "    attempts to install Docker and Docker Compose for you"
   echo "  update "
-  echo "     updates all client versions and ${__project_name} itself"
-  echo "  up|start"
-  echo "     starts the ${__app_name}, or restarts containers that had their image or"
-  echo "     configuration changed"
+  echo "    updates all client versions and ${__project_name} itself"
+  echo "  up|start [service-name]"
+  echo "    starts the ${__app_name}, or restarts containers that had their image or"
+  echo "    configuration changed. Can also start a specific service by name"
   echo "  down|stop [service-name]"
-  echo "     stops the ${__app_name}, or a specific service by name"
+  echo "    stops the ${__app_name}, or a specific service by name"
   echo "  restart [service-name]"
-  echo "     restarts the ${__app_name}, or a specific service by name, a combination of down and up"
+  echo "    restarts the ${__app_name}, or a specific service by name, a combination of down and up"
   echo "  version"
-  echo "     prints the version(s) of currently running client(s)"
+  echo "    prints the version(s) of currently running client(s)"
   echo "  logs"
-  echo "     shows logs"
+  echo "    shows logs"
   echo "  cmd <command>"
-  echo "     executes an arbitrary Docker Compose command. Use \"cmd help\" to list them"
+  echo "    executes an arbitrary Docker Compose command. Use \"cmd help\" to list them"
   echo "  terminate"
-  echo "     stops the ${__app_name} and destroys all data stores"
-  echo "  prune-bor"
-  echo "     stops the Bor execution client and prunes its DB. This takes about 20 hours"
+  echo "    stops the ${__app_name} and destroys all data stores"
+  echo "  space"
+  echo "    show Docker volume space usage"
   echo "  help"
-  echo "      print this help screen"
-  echo
+  echo "    print this help screen"
   echo
   echo "The logs command can be appended by flags and specify the container(s). example: "
   echo
   echo "  $__me logs -f --tail 50 ${__sample_service}"
   echo "    shows logs only for ${__sample_service} service"
   echo
-  echo
   echo "$__me will attempt to use sudo as needed for Docker commands"
   echo
 }
 
 
+help() {
+  case $* in
+    *update*) __update_help;;
+    *) __full_help;;
+  esac
+}
+
+
 # Main body from here
-ENV_FILE=.env
+__env_file=.env
 __during_update=0
 __during_migrate=0
 __migrated=0
 __command=""
 __me="./$(basename "${BASH_SOURCE[0]}")"
 
-trap 'handle_error $? $LINENO' ERR
+trap '__handle_error $? $LINENO' ERR
 
-if [[ "$#" -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
-  help
+if [[ "$#" -eq 0 || "$*" =~ "-h" ]]; then # Lazy match for -h and --help but also --histogram, so careful here
+  help "$@"
   exit 0
 fi
 
 cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 # Use this to make sure root doesn't end up owning files
-if [[ "$OSTYPE" == "darwin"* ]]; then
-# This is a macOS-ism
-# shellcheck disable=SC2016
-  OWNER=$(stat -f '$Su' .)
-else
-  OWNER=$(stat -c '%U' .)
-fi
+# shellcheck disable=SC2012
+OWNER=$(ls -ld . | awk '{print $3}')
 
 if [ "${OWNER}" == "root" ]; then
   echo "Please install ${__project_name} as a non-root user."
@@ -790,17 +1025,19 @@ __command="$1"
 shift
 __params=$*
 
-handle_root
-prep_prometheus
-determine_distro
+__handle_root
+__determine_distro
+__prep_conffiles
+
+__check_for_snap
 
 if [ "$__command" = "install" ]; then
   $__command "$@"
   exit "$?"
 fi
 
-handle_docker_sudo
-check_compose_version
+__handle_docker_sudo
+__check_compose_version
 
 if [ "${__old_compose}" -eq 1 ]; then
   echo
@@ -813,18 +1050,28 @@ if [ "${__old_compose}" -eq 1 ]; then
   exit 0
 fi
 
-if ! dodocker images >/dev/null 2>&1; then
+if [ "${__old_docker}" -eq 1 ]; then
+  echo
+  echo "Docker version ${__docker_version} detected. This version is no longer supported."
+  echo "Please update to a current version. Supported versions can be seen at https://endoflife.date/docker-engine."
+  echo
+  echo "This should be as simple as \"sudo apt update && sudo apt dist-upgrade\" on Debian/Ubuntu"
+  echo "or updating Docker Desktop on macOS and Windows."
+  exit 0
+fi
+
+if ! __dodocker images >/dev/null 2>&1; then
   echo "Please ensure you can call $__docker_exe before running ${__me}."
   exit 1
 fi
 
-if ! docompose --help >/dev/null 2>&1; then
+if ! __docompose --help >/dev/null 2>&1; then
   echo "Please ensure you can call $__compose_exe before running ${__me}."
   exit 1
 fi
 
 case "$__command" in
-  help|update|up|start|down|stop|restart|version|logs|cmd|terminate|prune-bor)
+  help|update|up|start|down|stop|restart|version|logs|cmd|terminate|space)
     $__command "$@";;
   *)
     echo "Unrecognized command $__command"
@@ -832,7 +1079,7 @@ case "$__command" in
     ;;
 esac
 
-check_disk_space
+__check_disk_space
 
 if [ "${__compose_upgraded}" -eq 1 ]; then
   echo
