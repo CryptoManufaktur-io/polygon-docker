@@ -15,9 +15,9 @@ extract_files() {
           processed_dates[$date_stamp]=1
           output_tar="heimdall-$NETWORK-snapshot-${date_stamp}.tar.zst"
           echo "Join parts for ${date_stamp} then extract"
-          cat heimdall-$NETWORK-snapshot-${date_stamp}-part* > "$output_tar"
-          rm heimdall-$NETWORK-snapshot-${date_stamp}-part*
-          pv -f -p $output_tar | zstdcat - | tar -xf - -C ${extract_dir} 2>&1 && rm $output_tar
+          cat "heimdall-$NETWORK-snapshot-${date_stamp}-part*" > "$output_tar"
+          rm "heimdall-$NETWORK-snapshot-${date_stamp}-part*"
+          pv -f -p "$output_tar" | zstdcat - | tar -xf - -C "${extract_dir}" 2>&1 && rm "$output_tar"
       fi
   done
 
@@ -30,9 +30,9 @@ extract_files() {
           processed_dates[$date_stamp]=1
           output_tar="heimdall-$NETWORK-snapshot-${date_stamp}.tar.zst"
           echo "Join parts for ${date_stamp} then extract"
-          cat heimdall-$NETWORK-snapshot-${date_stamp}-part* > "$output_tar"
-          rm heimdall-$NETWORK-snapshot-${date_stamp}-part*
-          pv -f -p $output_tar | zstdcat - | tar -xf - -C  ${extract_dir} --strip-components=3 2>&1 && rm $output_tar
+          cat "heimdall-$NETWORK-snapshot-${date_stamp}-part*" > "$output_tar"
+          rm "heimdall-$NETWORK-snapshot-${date_stamp}-part*"
+          pv -f -p "$output_tar" | zstdcat - | tar -xf - -C  "${extract_dir}" --strip-components=3 2>&1 && rm "$output_tar"
       fi
   done
 }
@@ -41,32 +41,34 @@ extract_files() {
 # If started as root, chown the `--datadir` and run heimdalld as heimdall
 if [ "$(id -u)" = '0' ]; then
    chown -R heimdall:heimdall /var/lib/heimdall
-   exec su-exec heimdall "$BASH_SOURCE" $@
+   exec su-exec heimdall "${BASH_SOURCE[0]}" "$@"
 fi
 
 if [ ! -f /var/lib/heimdall/setupdone ]; then
-  heimdalld init --home /var/lib/heimdall --chain ${NETWORK}
+  heimdalld init --home /var/lib/heimdall --chain "${NETWORK}"
   if [ -n "${SNAPSHOT}" ]; then
     mkdir -p /var/lib/heimdall/snapshots
     workdir=$(pwd)
     __dont_rm=0
     cd /var/lib/heimdall/snapshots
+# shellcheck disable=SC2076
     if [[ "${SNAPSHOT}" =~ ".txt" ]]; then
       # download snapshot files list
       aria2c -x6 -s6 "${SNAPSHOT}"
       # download all files, includes automatic checksum verification per increment
       set +e
       __filename=$(basename "${SNAPSHOT}")
-      aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=heimdall-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i ${__filename}
+      aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session="heimdall-$NETWORK-failures.txt" --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i "${__filename}"
 
       max_retries=5
       retry_count=0
 
       while [ $retry_count -lt $max_retries ]; do
         echo "Retrying failed parts, attempt $((retry_count + 1))..."
-        aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=heimdall-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i heimdall-$NETWORK-failures.txt
+        aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session="heimdall-$NETWORK-failures.txt" --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i "heimdall-$NETWORK-failures.txt"
 
         # Check the exit status of the aria2c command
+# shellcheck disable=SC2181
         if [ $? -eq 0 ]; then
             echo "Command succeeded."
             break  # Exit the loop since the command succeeded

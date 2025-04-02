@@ -15,9 +15,9 @@ extract_files() {
           processed_dates[$date_stamp]=1
           output_tar="bor-$NETWORK-snapshot-${date_stamp}.tar.zst"
           echo "Join parts for ${date_stamp} then extract"
-          cat bor-$NETWORK-snapshot-${date_stamp}-part* > "$output_tar"
-          rm bor-$NETWORK-snapshot-${date_stamp}-part*
-          pv -f -p $output_tar | zstdcat - | tar -xf - -C ${extract_dir} 2>&1 && rm $output_tar
+          cat "bor-$NETWORK-snapshot-${date_stamp}-part*" > "$output_tar"
+          rm "bor-$NETWORK-snapshot-${date_stamp}-part*"
+          pv -f -p "$output_tar" | zstdcat - | tar -xf - -C "${extract_dir}" 2>&1 && rm "$output_tar"
       fi
   done
 
@@ -30,9 +30,9 @@ extract_files() {
           processed_dates[$date_stamp]=1
           output_tar="bor-$NETWORK-snapshot-${date_stamp}.tar.zst"
           echo "Join parts for ${date_stamp} then extract"
-          cat bor-$NETWORK-snapshot-${date_stamp}-part* > "$output_tar"
-          rm bor-$NETWORK-snapshot-${date_stamp}-part*
-          pv -f -p $output_tar | zstdcat - | tar -xf - -C  ${extract_dir} --strip-components=3 2>&1 && rm $output_tar
+          cat "bor-$NETWORK-snapshot-${date_stamp}-part*" > "$output_tar"
+          rm "bor-$NETWORK-snapshot-${date_stamp}-part*"
+          pv -f -p "$output_tar" | zstdcat - | tar -xf - -C  "${extract_dir}" --strip-components=3 2>&1 && rm "$output_tar"
       fi
   done
 }
@@ -40,7 +40,7 @@ extract_files() {
 # If started as root, chown the `--datadir` and run bor as bor
 if [ "$(id -u)" = '0' ]; then
    chown -R bor:bor /var/lib/bor
-   exec su-exec bor "$BASH_SOURCE" "$@"
+   exec su-exec bor "${BASH_SOURCE[0]}" "$@"
 fi
 
 # Set verbosity
@@ -84,22 +84,24 @@ else
       workdir=$(pwd)
       __dont_rm=0
       cd /var/lib/bor/snapshots
+# shellcheck disable=SC2076
       if [[ "${SNAPSHOT}" =~ ".txt" ]]; then
         # download snapshot files list
         aria2c -x6 -s6 "${SNAPSHOT}"
         set +e
         __filename=$(basename "${SNAPSHOT}")
         # download files, includes automatic checksum verification per increment
-        aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=bor-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i ${__filename}
+        aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session="bor-$NETWORK-failures.txt" --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i "${__filename}"
 
         max_retries=5
         retry_count=0
 
         while [ $retry_count -lt $max_retries ]; do
           echo "Retrying failed parts, attempt $((retry_count + 1))..."
-          aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session=bor-$NETWORK-failures.txt --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i bor-$NETWORK-failures.txt
+          aria2c -x6 -s6 --max-tries=0 --save-session-interval=60 --save-session="bor-$NETWORK-failures.txt" --max-connection-per-server=4 --retry-wait=3 --check-integrity=true -i "bor-$NETWORK-failures.txt"
 
           # Check the exit status of the aria2c command
+# shellcheck disable=SC2181
           if [ $? -eq 0 ]; then
               echo "Command succeeded."
               break  # Exit the loop since the command succeeded
@@ -156,12 +158,15 @@ else
   else
     __pbss=""
   fi
+# shellcheck disable=SC2086
   bor dumpconfig "$@" ${__pbss} ${__verbosity} ${__bootnodes} ${EXTRAS} >/var/lib/bor/config.toml
   # Set user-supplied trusted nodes, also as static
   if [ -n "${TRUSTED_NODES}" ]; then
     for string in $(jq -r .[] <<< "${TRUSTED_NODES}"); do
-      dasel put -v $(echo $string) -f /var/lib/bor/config.toml 'p2p.discovery.trusted-nodes.[]'
-      dasel put -v $(echo $string) -f /var/lib/bor/config.toml 'p2p.discovery.static-nodes.[]'
+# shellcheck disable=SC2116
+      dasel put -v "$(echo "$string")" -f /var/lib/bor/config.toml 'p2p.discovery.trusted-nodes.[]'
+# shellcheck disable=SC2116
+      dasel put -v "$(echo "$string")" -f /var/lib/bor/config.toml 'p2p.discovery.static-nodes.[]'
     done
   fi
   exec bor server --config /var/lib/bor/config.toml
