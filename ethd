@@ -116,7 +116,7 @@ __env_migrate() {
 
     __get_value_from_env "${__var}" "${__env_file}.source" "__value"
     if [ "${__found}" -eq 1 ]; then  # Only if variable isn't new in default.env
-      if [[ "${__keep_targets}" -eq 0 && "$__var" =~ (_TAG|_REPO|_TARGET|_DOCKERFILE)$ ]]; then
+      if [[ "${__keep_targets}" -eq 0 && "$__var" =~ (_TAG|_REPO|_DOCKERFILE)$ ]]; then
         __get_value_from_env "${__var}" "default.env" "__value" # Reset build target to default.env value
       fi
       # Handle & gracefully, as well as multi-line
