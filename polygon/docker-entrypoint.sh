@@ -153,7 +153,7 @@ else
     if [ -n "${__files}" ]; then
       __pbss=""
     else
-      __pbss="--db.engine pebble --state.scheme path"
+      __pbss="--db.engine pebble --state.scheme path --syncmode snap"
     fi
   else
     __pbss=""
