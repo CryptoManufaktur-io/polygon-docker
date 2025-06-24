@@ -22,6 +22,7 @@ services:
       - ENABLE_PROMETHEUS_METRICS=true
       - LOG_LEVEL=${LOG_LEVEL}
       - SNAPSHOT=${HEIMDALL_SNAPSHOT}
+      - DOCKER_REPO=${HEIMDALL_REPO}
     restart: unless-stopped
     stop_grace_period: 1m
     networks:
@@ -70,6 +71,7 @@ services:
       - TRUSTED_NODES=${BOR_TRUSTED_NODES:-}
       - EXTRAS=${BOR_EXTRAS:-}
       - SNAPSHOT=${BOR_SNAPSHOT}
+      - SNAPSHOT_PART=${BOR_SNAPSHOT_PART}
     networks:
       default:
         aliases:

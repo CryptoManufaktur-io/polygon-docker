@@ -44,8 +44,24 @@ if [ "$(id -u)" = '0' ]; then
    exec su-exec heimdall "${BASH_SOURCE[0]}" "$@"
 fi
 
+case "${NETWORK}" in
+  mainnet ) __chain_id=heimdallv2-137;;
+  amoy ) __chain_id=heimdallv2-80002;;
+  * ) echo "The ${NETWORK} is not recognized for heimdall-v2"; sleep 60; exit 1;;
+esac
+
+if [[ "${DOCKER_REPO}" = *"heimdall-v2" && -f /var/lib/heimdall/setupdone && ! -f /var/lib/heimdall/migrated ]]; then
+# See https://github.com/0xPolygon/heimdall-v2/blob/develop/migration/README.md#containerized-migration
+  mv /var/lib/heimdall/data /var/lib/heimdall/data-v1
+  heimdalld init "${BOR_NODE_ID:-upbeatCucumber}" --home /var/lib/heimdall --chain-id "${__chain_id}"
+  touch /var/lib/heimdall/migrated
+fi
 if [ ! -f /var/lib/heimdall/setupdone ]; then
-  heimdalld init --home /var/lib/heimdall --chain "${NETWORK}"
+  if [[ "${DOCKER_REPO}" = *"heimdall-v2" ]]; then
+    heimdalld init "${BOR_NODE_ID:-upbeatCucumber}" --home /var/lib/heimdall --chain-id "${__chain_id}"
+  else
+    heimdalld init --home /var/lib/heimdall --chain "${NETWORK}"
+  fi
   if [ -n "${SNAPSHOT}" ]; then
     mkdir -p /var/lib/heimdall/snapshots
     workdir=$(pwd)
@@ -126,7 +142,9 @@ dasel put -v "main:${LOG_LEVEL},state:${LOG_LEVEL},*:error" -f /var/lib/heimdall
 dasel put -v "tcp://0.0.0.0:${HEIMDALL_RPC_PORT}" -f /var/lib/heimdall/config/config.toml 'rpc.laddr'
 dasel put -v "tcp://${SERVER_IP}:${HEIMDALL_P2P_PORT}" -f /var/lib/heimdall/config/config.toml 'p2p.external_address'
 dasel put -v "tcp://0.0.0.0:${HEIMDALL_P2P_PORT}" -f /var/lib/heimdall/config/config.toml 'p2p.laddr'
-dasel put -v "${BOR_NODE_ID:-upbeatCucumber}" -f /var/lib/heimdall/config/config.toml 'moniker'
+if [[ ! "${DOCKER_REPO}" = *"heimdall-v2" ]]; then
+  dasel put -v "${BOR_NODE_ID:-upbeatCucumber}" -f /var/lib/heimdall/config/config.toml 'moniker'
+fi
 dasel put -v "${ENABLE_PROMETHEUS_METRICS:-false}" -f /var/lib/heimdall/config/config.toml 'instrumentation.prometheus'
 dasel put -v "300" -f /var/lib/heimdall/config/config.toml 'p2p.max_num_inbound_peers'
 dasel put -v "100" -f /var/lib/heimdall/config/config.toml 'p2p.max_num_outbound_peers'
