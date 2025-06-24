@@ -1,6 +1,55 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+__get_snapshot() {
+  local __url=$1
+  local __filename=""
+
+  aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true "${__url}"
+  __filename=$(echo "${__url}" | awk -F/ '{print $NF}')
+  if [[ "${__filename}" =~ \.tar\.zst$ ]]; then
+    pzstd -c -d "${__filename}" | tar xvf - -C /var/lib/bor/data/
+  elif [[ "${__filename}" =~ \.tar\.gz$ || "${__filename}" =~ \.tgz$ ]]; then
+    tar xzvf "${__filename}" -C /var/lib/bor/data/
+  elif [[ "${__filename}" =~ \.tar$ ]]; then
+    tar xvf "${__filename}" -C /var/lib/bor/data/
+  elif [[ "${__filename}" =~ \.lz4$ ]]; then
+    lz4 -d "${__filename}" | tar xvf - -C /var/lib/bor/data/
+  else
+    __dont_rm=1
+    echo "The snapshot file has a format that Polygon Docker can't handle."
+  fi
+  if [ "${__dont_rm}" -eq 0 ]; then
+    rm -f "${__filename}"
+  fi
+  # try to find the directory
+  __search_dir="chaindata"
+  __base_dir="/var/lib/bor/data"
+  __found_path=$(find "$__base_dir" -type d -path "*/$__search_dir" -print -quit)
+  if [ "${__found_path}" = "${__base_dir}chaindata" ]; then
+    echo "Found chaindata in root directory, moving it to bor folder"
+    mkdir -p "$__base_dir/bor"
+    mv "$__found_path" "$__base_dir/bor"
+  elif [ -n "$__found_path" ]; then
+    __bor_dir=$(dirname "$__found_path")
+    __bor_dir=${__bor_dir%/chaindata}
+    if [ "${__bor_dir}" = "${__base_dir}bor" ]; then
+       echo "Snapshot extracted into ${__bor_dir}/chaindata"
+    else
+      echo "Found a geth directory at ${__bor_dir}, moving it."
+      mv "$__bor_dir" "$__base_dir"
+      rm -rf "$__bor_dir"
+    fi
+  fi
+  if [[ ! -d "/var/lib/bor/data/bor/chaindata" ]]; then
+    echo "Chaindata isn't in the expected location."
+    echo "This snapshot likely won't work until the fetch script has been adjusted for it."
+    sleep 60
+    exit 1
+  fi
+}
+
+
 extract_files() {
   extract_dir=$1
 
@@ -79,13 +128,14 @@ if [ -f /var/lib/bor/prune-marker ]; then
 else
   if [ ! -f /var/lib/bor/setupdone ]; then
     if [ -n "${SNAPSHOT}" ]; then
-      mkdir -p /var/lib/bor/data/bor/chaindata
+      mkdir -p /var/lib/bor/data/bor
       mkdir -p /var/lib/bor/snapshots
       workdir=$(pwd)
       __dont_rm=0
       cd /var/lib/bor/snapshots
 # shellcheck disable=SC2076
       if [[ "${SNAPSHOT}" =~ ".txt" ]]; then
+        mkdir -p /var/lib/bor/data/bor/chaindata
         # download snapshot files list
         aria2c -x6 -s6 "${SNAPSHOT}"
         set +e
@@ -120,27 +170,9 @@ else
         set -e
         extract_files /var/lib/bor/data/bor/chaindata
       else
-        aria2c -c -x6 -s6 --auto-file-renaming=false --conditional-get=true --allow-overwrite=true "${SNAPSHOT}"
-        filename=$(echo "${SNAPSHOT}" | awk -F/ '{print $NF}')
-        if [[ "${filename}" =~ \.tar\.zst$ ]]; then
-          pzstd -c -d "${filename}" | tar xvf - -C /var/lib/bor/data/bor/
-        elif [[ "${filename}" =~ \.tar\.gz$ || "${filename}" =~ \.tgz$ ]]; then
-          tar xzvf "${filename}" -C /var/lib/bor/data/bor/
-        elif [[ "${filename}" =~ \.tar$ ]]; then
-          tar xvf "${filename}" -C /var/lib/bor/data/bor/
-        elif [[ "${filename}" =~ \.lz4$ ]]; then
-          lz4 -d "${filename}" | tar xvf - -C /var/lib/bor/data/bor/
-        else
-          __dont_rm=1
-          echo "The snapshot file has a format that Polygon Docker can't handle."
-          echo "Please come to CryptoManufaktur Discord to work through this."
-        fi
-        if [ "${__dont_rm}" -eq 0 ]; then
-          rm -f "${filename}"
-        fi
-        if [[ ! -d "/var/lib/bor/data/bor/chaindata" ]]; then
-          echo "Chaindata isn't in the expected location."
-          echo "This snapshot likely won't work until the fetch script has been adjusted for it."
+        __get_snapshot "${SNAPSHOT}"
+        if [ -n "${SNAPSHOT_PART}" ]; then
+          __get_snapshot "${SNAPSHOT_PART}"
         fi
       fi
       cd "${workdir}"
