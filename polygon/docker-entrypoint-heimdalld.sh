@@ -52,13 +52,37 @@ esac
 
 if [[ "${DOCKER_REPO}" = *"heimdall-v2" && -f /var/lib/heimdall/setupdone && ! -f /var/lib/heimdall/migrated ]]; then
 # See https://github.com/0xPolygon/heimdall-v2/blob/develop/migration/README.md#containerized-migration
-  mv /var/lib/heimdall/data /var/lib/heimdall/data-v1
-  heimdalld init "${BOR_NODE_ID:-upbeatCucumber}" --home /var/lib/heimdall --chain-id "${__chain_id}"
+  if [[ -d /var/lib/heimdall/data && ! -d /var/lib/heimdall/data-v1 ]]; then
+    mv /var/lib/heimdall/data /var/lib/heimdall/data-v1
+    mv /var/lib/heimdall/config /var/lib/heimdall/config-v1
+    mkdir -p /var/lib/heimdall/data
+    cat >/var/lib/heimdall/data/priv_validator_state.json <<EOF
+{
+  "height": "0",
+  "round": 0,
+  "step": 0
+}
+EOF
+  fi
+  rm -f /var/lib/heimdall/genesis-amoy-v1.json
+  rm -f /var/lib/heimdall/config/genesis.json
+  heimdalld init "${BOR_NODE_ID:-upbeatCucumber}" --home /var/lib/heimdall --chain-id "${__chain_id}" --log_level info --overwrite
+  curl -L -o /var/lib/heimdall/config/genesis.json "https://storage.googleapis.com/${NETWORK}-heimdallv2-genesis/migrated_dump-genesis.json"
+  cp /var/lib/heimdall/config-v1/addrbook.json /var/lib/heimdall/config/
   touch /var/lib/heimdall/migrated
 fi
 if [ ! -f /var/lib/heimdall/setupdone ]; then
   if [[ "${DOCKER_REPO}" = *"heimdall-v2" ]]; then
-    heimdalld init "${BOR_NODE_ID:-upbeatCucumber}" --home /var/lib/heimdall --chain-id "${__chain_id}"
+    mkdir -p /var/lib/heimdall/data
+    cat >/var/lib/heimdall/data/priv_validator_state.json <<EOF
+{
+  "height": "0",
+  "round": 0,
+  "step": 0
+}
+EOF
+    heimdalld init "${BOR_NODE_ID:-upbeatCucumber}" --home /var/lib/heimdall --chain-id "${__chain_id}" --log-level info --overwrite
+    curl -L -o /var/lib/heimdall/config/genesis.json "https://storage.googleapis.com/${NETWORK}-heimdallv2-genesis/migrated_dump-genesis.json"
   else
     heimdalld init --home /var/lib/heimdall --chain "${NETWORK}"
   fi
@@ -138,17 +162,23 @@ if [ -n "${HEIMDALL_PEERS}" ]; then
   dasel put -v "${HEIMDALL_PEERS}" -f /var/lib/heimdall/config/config.toml 'p2p.persistent_peers'
 fi
 
-dasel put -v "main:${LOG_LEVEL},state:${LOG_LEVEL},*:error" -f /var/lib/heimdall/config/config.toml 'log_level'
 dasel put -v "tcp://0.0.0.0:${HEIMDALL_RPC_PORT}" -f /var/lib/heimdall/config/config.toml 'rpc.laddr'
 dasel put -v "tcp://${SERVER_IP}:${HEIMDALL_P2P_PORT}" -f /var/lib/heimdall/config/config.toml 'p2p.external_address'
 dasel put -v "tcp://0.0.0.0:${HEIMDALL_P2P_PORT}" -f /var/lib/heimdall/config/config.toml 'p2p.laddr'
-if [[ ! "${DOCKER_REPO}" = *"heimdall-v2" ]]; then
+if [[ "${DOCKER_REPO}" = *"heimdall-v2" ]]; then
+  dasel put -v "${HEIMDALL_BOR_RPC_URL}" -f /var/lib/heimdall/config/app.toml 'custom.bor_rpc_url'
+  dasel put -v "${HEIMDALL_ETH_RPC_URL}" -f /var/lib/heimdall/config/app.toml 'custom.eth_rpc_url'
+  dasel put -v "${NETWORK}" -f /var/lib/heimdall/config/app.toml 'custom.chain'
+  dasel put -v "http://0.0.0.0:${HEIMDALL_RPC_PORT}" -f /var/lib/heimdall/config/app.toml 'custom.comet_bft_rpc_url'
+  dasel put -v "${LOG_LEVEL}" -f /var/lib/heimdall/config/config.toml 'log_level'
+else
+  dasel put -v "main:${LOG_LEVEL},state:${LOG_LEVEL},*:error" -f /var/lib/heimdall/config/config.toml 'log_level'
   dasel put -v "${BOR_NODE_ID:-upbeatCucumber}" -f /var/lib/heimdall/config/config.toml 'moniker'
+  dasel put -v "${ENABLE_PROMETHEUS_METRICS:-false}" -f /var/lib/heimdall/config/config.toml 'instrumentation.prometheus'
+  dasel put -v "300" -f /var/lib/heimdall/config/config.toml 'p2p.max_num_inbound_peers'
+  dasel put -v "100" -f /var/lib/heimdall/config/config.toml 'p2p.max_num_outbound_peers'
+  dasel put -v "http://0.0.0.0:${HEIMDALL_RPC_PORT}" -f /var/lib/heimdall/config/heimdall-config.toml 'tendermint_rpc_url'
+  dasel put -v "${HEIMDALL_BOR_RPC_URL}" -f /var/lib/heimdall/config/heimdall-config.toml 'bor_rpc_url'
+  dasel put -v "${HEIMDALL_ETH_RPC_URL}" -f /var/lib/heimdall/config/heimdall-config.toml 'eth_rpc_url'
 fi
-dasel put -v "${ENABLE_PROMETHEUS_METRICS:-false}" -f /var/lib/heimdall/config/config.toml 'instrumentation.prometheus'
-dasel put -v "300" -f /var/lib/heimdall/config/config.toml 'p2p.max_num_inbound_peers'
-dasel put -v "100" -f /var/lib/heimdall/config/config.toml 'p2p.max_num_outbound_peers'
-dasel put -v "http://0.0.0.0:${HEIMDALL_RPC_PORT}" -f /var/lib/heimdall/config/heimdall-config.toml 'tendermint_rpc_url'
-dasel put -v "${HEIMDALL_BOR_RPC_URL}" -f /var/lib/heimdall/config/heimdall-config.toml 'bor_rpc_url'
-dasel put -v "${HEIMDALL_ETH_RPC_URL}" -f /var/lib/heimdall/config/heimdall-config.toml 'eth_rpc_url'
 exec "$@"
