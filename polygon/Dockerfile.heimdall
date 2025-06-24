@@ -28,4 +28,4 @@ COPY ./docker-entrypoint-heimdalld.sh /usr/local/bin/docker-entrypoint.sh
 
 USER ${USER}
 
-CMD [ "/bin/sh", "-c", "# (nop)" ]
+CMD [ "heimdalld" ]
