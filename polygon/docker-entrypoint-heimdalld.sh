@@ -112,7 +112,7 @@ if [ ! -f /var/lib/heimdall/setupdone ]; then
       elif [[ "${filename}" =~ \.tar$ ]]; then
         tar xvf "${filename}" -C /var/lib/heimdall/data/
       elif [[ "${filename}" =~ \.lz4$ ]]; then
-        lz4 -d "${filename}" | tar xvf - -C /var/lib/heimdall/data/
+        lz4 -c -d "${filename}" | tar xvf - -C /var/lib/heimdall/data/
       else
         __dont_rm=1
         echo "The snapshot file has a format that Polygon Docker can't handle."
