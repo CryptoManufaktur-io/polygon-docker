@@ -14,7 +14,7 @@ __get_snapshot() {
   elif [[ "${__filename}" =~ \.tar$ ]]; then
     tar xvf "${__filename}" -C /var/lib/bor/data/
   elif [[ "${__filename}" =~ \.lz4$ ]]; then
-    lz4 -d "${__filename}" | tar xvf - -C /var/lib/bor/data/
+    lz4 -c -d "${__filename}" | tar xvf - -C /var/lib/bor/data/
   else
     __dont_rm=1
     echo "The snapshot file has a format that Polygon Docker can't handle."
@@ -24,21 +24,21 @@ __get_snapshot() {
   fi
   # try to find the directory
   __search_dir="chaindata"
-  __base_dir="/var/lib/bor/data"
+  __base_dir="/var/lib/bor/data/"
   __found_path=$(find "$__base_dir" -type d -path "*/$__search_dir" -print -quit)
   if [ "${__found_path}" = "${__base_dir}chaindata" ]; then
     echo "Found chaindata in root directory, moving it to bor folder"
-    mkdir -p "$__base_dir/bor"
-    mv "$__found_path" "$__base_dir/bor"
-  elif [ -n "$__found_path" ]; then
+    mkdir -p "${__base_dir}bor"
+    mv "${__found_path}" "${__base_dir}bor"
+  elif [ -n "${__found_path}" ]; then
     __bor_dir=$(dirname "$__found_path")
     __bor_dir=${__bor_dir%/chaindata}
     if [ "${__bor_dir}" = "${__base_dir}bor" ]; then
        echo "Snapshot extracted into ${__bor_dir}/chaindata"
     else
-      echo "Found a geth directory at ${__bor_dir}, moving it."
-      mv "$__bor_dir" "$__base_dir"
-      rm -rf "$__bor_dir"
+      echo "Found a bor directory at ${__bor_dir}, moving it."
+      mv "${__bor_dir}" "${__base_dir}"
+      rm -rf "${__bor_dir}"
     fi
   fi
   if [[ ! -d "/var/lib/bor/data/bor/chaindata" ]]; then
