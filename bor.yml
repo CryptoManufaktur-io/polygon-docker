@@ -72,6 +72,8 @@ services:
       - EXTRAS=${BOR_EXTRAS:-}
       - SNAPSHOT=${BOR_SNAPSHOT}
       - SNAPSHOT_PART=${BOR_SNAPSHOT_PART}
+      - HEIMDALL_REPO=${HEIMDALL_REPO}
+      - HEIMDALL_RPC_PORT=${HEIMDALL_RPC_PORT:-26657}
     networks:
       default:
         aliases:

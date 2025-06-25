@@ -190,8 +190,13 @@ else
   else
     __pbss=""
   fi
+  if [[ "${HEIMDALL_REPO}" = *"heimdall-v2" ]]; then
+    __ws="--bor.heimdallWS ${NETWORK}-heimdalld:${HEIMDALL_RPC_PORT}/websocket"
+  else
+    __ws=""
+  fi
 # shellcheck disable=SC2086
-  bor dumpconfig "$@" ${__pbss} ${__verbosity} ${__bootnodes} ${EXTRAS} >/var/lib/bor/config.toml
+  bor dumpconfig "$@" ${__ws} ${__pbss} ${__verbosity} ${__bootnodes} ${EXTRAS} >/var/lib/bor/config.toml
   # Set user-supplied trusted nodes, also as static
   if [ -n "${TRUSTED_NODES}" ]; then
     for string in $(jq -r .[] <<< "${TRUSTED_NODES}"); do
