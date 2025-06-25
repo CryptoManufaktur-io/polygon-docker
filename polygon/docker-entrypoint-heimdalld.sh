@@ -52,7 +52,7 @@ if [[ "${DOCKER_REPO}" = *"heimdall-v2" ]]; then
   esac
 fi
 
-if [[ "${DOCKER_REPO}" = *"heimdall-v2" && -f /var/lib/heimdall/setupdone && ! -f /var/lib/heimdall/migrated ]]; then
+if [[ "${DOCKER_REPO}" = *"heimdall-v2" && -f /var/lib/heimdall/setupdone && ! -f /var/lib/heimdall/is_v2 ]]; then
 # See https://github.com/0xPolygon/heimdall-v2/blob/develop/migration/README.md#containerized-migration
   if [[ -d /var/lib/heimdall/data && ! -d /var/lib/heimdall/data-v1 ]]; then
     mv /var/lib/heimdall/data /var/lib/heimdall/data-v1
@@ -65,13 +65,14 @@ if [[ "${DOCKER_REPO}" = *"heimdall-v2" && -f /var/lib/heimdall/setupdone && ! -
   curl -L -o /var/lib/heimdall/config/genesis.json "https://storage.googleapis.com/${NETWORK}-heimdallv2-genesis/migrated_dump-genesis.json"
   cp /var/lib/heimdall/config/genesis.json /var/lib/heimdall/genesis-amoy-v2.json
   cp /var/lib/heimdall/config-v1/addrbook.json /var/lib/heimdall/config/
-  touch /var/lib/heimdall/migrated
+  touch /var/lib/heimdall/is_v2
 fi
 if [ ! -f /var/lib/heimdall/setupdone ]; then
   if [[ "${DOCKER_REPO}" = *"heimdall-v2" ]]; then
     heimdalld init "${BOR_NODE_ID:-upbeatCucumber}" --home /var/lib/heimdall --chain-id "${__chain_id}" --log_level info
     # TBD whether this naming holds true for mainnet as well
     cp "/var/lib/heimdall/genesis-${NETWORK}-v2.json" /var/lib/heimdall/config/genesis.json
+    touch /var/lib/heimdall/is_v2  # Do not trigger migration
   else
     heimdalld init --home /var/lib/heimdall --chain "${NETWORK}"
   fi
