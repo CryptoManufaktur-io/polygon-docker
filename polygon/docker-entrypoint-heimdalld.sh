@@ -44,11 +44,13 @@ if [ "$(id -u)" = '0' ]; then
    exec su-exec heimdall "${BASH_SOURCE[0]}" "$@"
 fi
 
-case "${NETWORK}" in
-  mainnet ) __chain_id=heimdallv2-137;;
-  amoy ) __chain_id=heimdallv2-80002;;
-  * ) echo "The ${NETWORK} is not recognized for heimdall-v2"; sleep 60; exit 1;;
-esac
+if [[ "${DOCKER_REPO}" = *"heimdall-v2" ]]; then
+  case "${NETWORK}" in
+    mainnet ) __chain_id=heimdallv2-137;;
+    amoy ) __chain_id=heimdallv2-80002;;
+    * ) echo "The ${NETWORK} is not recognized for heimdall-v2"; sleep 60; exit 1;;
+  esac
+fi
 
 if [[ "${DOCKER_REPO}" = *"heimdall-v2" && -f /var/lib/heimdall/setupdone && ! -f /var/lib/heimdall/migrated ]]; then
 # See https://github.com/0xPolygon/heimdall-v2/blob/develop/migration/README.md#containerized-migration
