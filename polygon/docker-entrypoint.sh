@@ -191,7 +191,7 @@ else
     __pbss=""
   fi
   if [[ "${HEIMDALL_REPO}" = *"heimdall-v2" ]]; then
-    __ws="--bor.heimdallWS ${NETWORK}-heimdalld:${HEIMDALL_RPC_PORT}/websocket"
+    __ws="--bor.heimdallWS ws://${NETWORK}-heimdalld:${HEIMDALL_RPC_PORT}/websocket"
   else
     __ws=""
   fi
