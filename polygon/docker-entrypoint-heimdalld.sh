@@ -48,25 +48,10 @@ if [[ "${DOCKER_REPO}" = *"heimdall-v2" ]]; then
   case "${NETWORK}" in
     mainnet ) __chain_id=heimdallv2-137;;
     amoy ) __chain_id=heimdallv2-80002;;
-    * ) echo "The ${NETWORK} is not recognized for heimdall-v2"; sleep 60; exit 1;;
+    * ) echo "The ${NETWORK} network is not recognized for heimdall-v2"; sleep 60; exit 1;;
   esac
 fi
 
-if [[ "${DOCKER_REPO}" = *"heimdall-v2" && -f /var/lib/heimdall/setupdone && ! -f /var/lib/heimdall/is_v2 ]]; then
-# See https://github.com/0xPolygon/heimdall-v2/blob/develop/migration/README.md#containerized-migration
-  if [[ -d /var/lib/heimdall/data && ! -d /var/lib/heimdall/data-v1 ]]; then
-    mv /var/lib/heimdall/data /var/lib/heimdall/data-v1
-  fi
-  if [[ -d /var/lib/heimdall/config && ! -d /var/lib/heimdall/config-v1 ]]; then
-    mv /var/lib/heimdall/config /var/lib/heimdall/config-v1
-  fi
-  rm -f /var/lib/heimdall/genesis-amoy-v1.json
-  heimdalld init "${BOR_NODE_ID:-upbeatCucumber}" --home /var/lib/heimdall --chain-id "${__chain_id}" --log_level info
-  curl -L -o /var/lib/heimdall/config/genesis.json "https://storage.googleapis.com/${NETWORK}-heimdallv2-genesis/migrated_dump-genesis.json"
-  cp /var/lib/heimdall/config/genesis.json /var/lib/heimdall/genesis-amoy-v2.json
-  cp /var/lib/heimdall/config-v1/addrbook.json /var/lib/heimdall/config/
-  touch /var/lib/heimdall/is_v2
-fi
 if [ ! -f /var/lib/heimdall/setupdone ]; then
   if [[ "${DOCKER_REPO}" = *"heimdall-v2" ]]; then
     heimdalld init "${BOR_NODE_ID:-upbeatCucumber}" --home /var/lib/heimdall --chain-id "${__chain_id}" --log_level info
@@ -144,6 +129,24 @@ if [ ! -f /var/lib/heimdall/setupdone ]; then
   fi
   touch /var/lib/heimdall/setupdone
 fi
+
+if [[ "${DOCKER_REPO}" = *"heimdall-v2" && -f /var/lib/heimdall/setupdone && ! -f /var/lib/heimdall/is_v2 ]]; then
+# See https://github.com/0xPolygon/heimdall-v2/blob/develop/migration/README.md#containerized-migration
+  if [[ -d /var/lib/heimdall/data && ! -d /var/lib/heimdall/data-v1 ]]; then
+    mv /var/lib/heimdall/data /var/lib/heimdall/data-v1
+  fi
+  if [[ -d /var/lib/heimdall/config && ! -d /var/lib/heimdall/config-v1 ]]; then
+    mv /var/lib/heimdall/config /var/lib/heimdall/config-v1
+  fi
+  rm -f "/var/lib/heimdall/genesis-${NETWORK}-v1.json"
+  heimdalld init "${BOR_NODE_ID:-upbeatCucumber}" --home /var/lib/heimdall --chain-id "${__chain_id}" --log_level info
+# TBD verify that this URL works for mainnet
+  curl -L -o /var/lib/heimdall/config/genesis.json "https://storage.googleapis.com/${NETWORK}-heimdallv2-genesis/migrated_dump-genesis.json"
+  cp /var/lib/heimdall/config/genesis.json "/var/lib/heimdall/genesis-${NETWORK}-v2.json"
+  cp /var/lib/heimdall/config-v1/addrbook.json /var/lib/heimdall/config/
+  touch /var/lib/heimdall/is_v2
+fi
+
 SERVER_IP=$(curl -s ifconfig.me)
 if [ -n "${HEIMDALL_SEEDS}" ]; then
   dasel put -v "${HEIMDALL_SEEDS}" -f /var/lib/heimdall/config/config.toml 'p2p.seeds'
