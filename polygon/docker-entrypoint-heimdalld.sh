@@ -61,12 +61,13 @@ if [[ "${DOCKER_REPO}" = *"heimdall-v2" && -f /var/lib/heimdall/setupdone && ! -
   rm -f /var/lib/heimdall/genesis-amoy-v1.json
   heimdalld init "${BOR_NODE_ID:-upbeatCucumber}" --home /var/lib/heimdall --chain-id "${__chain_id}" --log_level info
   curl -L -o /var/lib/heimdall/config/genesis.json "https://storage.googleapis.com/${NETWORK}-heimdallv2-genesis/migrated_dump-genesis.json"
+  cp /var/lib/heimdall/config/genesis.json /var/lib/heimdall/genesis-amoy-v2.json
   cp /var/lib/heimdall/config-v1/addrbook.json /var/lib/heimdall/config/
   touch /var/lib/heimdall/migrated
 fi
 if [ ! -f /var/lib/heimdall/setupdone ]; then
   if [[ "${DOCKER_REPO}" = *"heimdall-v2" ]]; then
-    heimdalld init "${BOR_NODE_ID:-upbeatCucumber}" --home /var/lib/heimdall --chain-id "${__chain_id}" --log-level info
+    heimdalld init "${BOR_NODE_ID:-upbeatCucumber}" --home /var/lib/heimdall --chain-id "${__chain_id}" --log_level info
     curl -L -o /var/lib/heimdall/config/genesis.json "https://storage.googleapis.com/${NETWORK}-heimdallv2-genesis/migrated_dump-genesis.json"
   else
     heimdalld init --home /var/lib/heimdall --chain "${NETWORK}"
