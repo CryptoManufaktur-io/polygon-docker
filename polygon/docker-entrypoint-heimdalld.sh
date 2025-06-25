@@ -68,7 +68,8 @@ fi
 if [ ! -f /var/lib/heimdall/setupdone ]; then
   if [[ "${DOCKER_REPO}" = *"heimdall-v2" ]]; then
     heimdalld init "${BOR_NODE_ID:-upbeatCucumber}" --home /var/lib/heimdall --chain-id "${__chain_id}" --log_level info
-    curl -L -o /var/lib/heimdall/config/genesis.json "https://storage.googleapis.com/${NETWORK}-heimdallv2-genesis/migrated_dump-genesis.json"
+    # TBD whether this naming holds true for mainnet as well
+    cp "/var/lib/heimdall/genesis-${NETWORK}-v2.json" /var/lib/heimdall/config/genesis.json
   else
     heimdalld init --home /var/lib/heimdall --chain "${NETWORK}"
   fi
