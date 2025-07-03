@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -Eeuo pipefail
 
 extract_files() {
@@ -131,7 +131,7 @@ if [ ! -f /var/lib/heimdall/setupdone ]; then
 fi
 
 if [[ "${DOCKER_REPO}" = *"heimdall-v2" && -f /var/lib/heimdall/setupdone && ! -f /var/lib/heimdall/is_v2 ]]; then
-# See https://github.com/0xPolygon/heimdall-v2/blob/develop/migration/README.md#containerized-migration
+# See https://github.com/0xPolygon/heimdall-v2/blob/develop/migration/containerized/2-MIGRATION.md
   if [[ -d /var/lib/heimdall/data && ! -d /var/lib/heimdall/data-v1 ]]; then
     mv /var/lib/heimdall/data /var/lib/heimdall/data-v1
   fi
