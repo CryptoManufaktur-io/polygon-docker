@@ -140,7 +140,6 @@ if [[ "${DOCKER_REPO}" = *"heimdall-v2" && -f /var/lib/heimdall/setupdone && ! -
   fi
   rm -f "/var/lib/heimdall/genesis-${NETWORK}-v1.json"
   heimdalld init "${BOR_NODE_ID:-upbeatCucumber}" --home /var/lib/heimdall --chain-id "${__chain_id}" --log_level info
-# TBD verify that this URL works for mainnet
   curl -L -o /var/lib/heimdall/config/genesis.json "https://storage.googleapis.com/${NETWORK}-heimdallv2-genesis/migrated_dump-genesis.json"
   cp /var/lib/heimdall/config/genesis.json "/var/lib/heimdall/genesis-${NETWORK}-v2.json"
   cp /var/lib/heimdall/config-v1/addrbook.json /var/lib/heimdall/config/
@@ -162,16 +161,10 @@ if [[ "${DOCKER_REPO}" = *"heimdall-v2" ]]; then
   dasel put -v "${HEIMDALL_BOR_RPC_URL}" -f /var/lib/heimdall/config/app.toml 'custom.bor_rpc_url'
   dasel put -v "${HEIMDALL_ETH_RPC_URL}" -f /var/lib/heimdall/config/app.toml 'custom.eth_rpc_url'
   dasel put -v "${NETWORK}" -f /var/lib/heimdall/config/app.toml 'custom.chain'
+  dasel put -v "false" -f /var/lib/heimdall/config/app.toml 'custom.bor_grpc_flag'
+  dasel put -v "1s" -f /var/lib/heimdall/config/app.toml 'custom.bor_rpc_timeout'
   dasel put -v "http://0.0.0.0:${HEIMDALL_RPC_PORT}" -f /var/lib/heimdall/config/app.toml 'custom.comet_bft_rpc_url'
   dasel put -v "${LOG_LEVEL}" -f /var/lib/heimdall/config/config.toml 'log_level'
-  # Self-healing URL is known correct for Amoy; verify for mainnet when the time comes. TBD
-# See https://github.com/0xPolygon/heimdall-v2/blob/develop/migration/script/RUNBOOK.md
-  dasel put -v "https://api.studio.thegraph.com/query/113009/${NETWORK}-subgraph-polygon/version/latest" \
-    -f /var/lib/heimdall/config/app.toml 'custom.sub_graph_url'
-  dasel put -v "true" -f /var/lib/heimdall/config/app.toml 'custom.enable_self_heal'
-  dasel put -v "1h0m0s" -f /var/lib/heimdall/config/app.toml 'custom.sh_state_synced_interval'
-  dasel put -v "1h0m0s" -f /var/lib/heimdall/config/app.toml 'custom.sh_stake_update_interval'
-  dasel put -v "24h0m0s" -f /var/lib/heimdall/config/app.toml 'custom.sh_max_depth_duration'
 else
   dasel put -v "main:${LOG_LEVEL},state:${LOG_LEVEL},*:error" -f /var/lib/heimdall/config/config.toml 'log_level'
   dasel put -v "${BOR_NODE_ID:-upbeatCucumber}" -f /var/lib/heimdall/config/config.toml 'moniker'
