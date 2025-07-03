@@ -34,4 +34,4 @@ as well as the `HEIMDALL_REPO`, `HEIMDALL_TAG` and `BOR_REPO` and `BOR_TAG` vari
 
 # Version
 
-This is Polygon Docker v2.4.0
+This is Polygon Docker v2.5.0
