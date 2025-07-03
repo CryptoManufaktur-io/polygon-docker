@@ -26,22 +26,11 @@ version() {
       __docompose exec bor bor version
       echo
       ;;&
-    *grafana.yml* )
-      __docompose exec prometheus /bin/prometheus --version
-      echo
-      echo -n "Grafana "
-      __docompose exec grafana /run.sh -v
-      echo
-      ;;&
   esac
 }
 
 
 __prep_conffiles() {
-# Create custom-prom.yml if it doesn't exist
-  if [ ! -f "./prometheus/custom-prom.yml" ]; then
-    $__as_owner touch "./prometheus/custom-prom.yml"
-  fi
   return
 }
 
