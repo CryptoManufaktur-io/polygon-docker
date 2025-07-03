@@ -161,7 +161,7 @@ if [[ "${DOCKER_REPO}" = *"heimdall-v2" ]]; then
   dasel put -v "${HEIMDALL_BOR_RPC_URL}" -f /var/lib/heimdall/config/app.toml 'custom.bor_rpc_url'
   dasel put -v "${HEIMDALL_ETH_RPC_URL}" -f /var/lib/heimdall/config/app.toml 'custom.eth_rpc_url'
   dasel put -v "${NETWORK}" -f /var/lib/heimdall/config/app.toml 'custom.chain'
-  dasel put -v "false" -f /var/lib/heimdall/config/app.toml 'custom.bor_grpc_flag'
+  dasel put -t bool -v "false" -f /var/lib/heimdall/config/app.toml 'custom.bor_grpc_flag'
   dasel put -v "1s" -f /var/lib/heimdall/config/app.toml 'custom.bor_rpc_timeout'
   dasel put -v "http://0.0.0.0:${HEIMDALL_RPC_PORT}" -f /var/lib/heimdall/config/app.toml 'custom.comet_bft_rpc_url'
   dasel put -v "${LOG_LEVEL}" -f /var/lib/heimdall/config/config.toml 'log_level'
