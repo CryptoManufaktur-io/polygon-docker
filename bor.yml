@@ -23,6 +23,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL}
       - SNAPSHOT=${HEIMDALL_SNAPSHOT}
       - DOCKER_REPO=${HEIMDALL_REPO}
+      - HEIMDALL_V2_GENESIS_URL=${HEIMDALL_V2_GENESIS_URL:-}
     restart: unless-stopped
     stop_grace_period: 1m
     networks:
