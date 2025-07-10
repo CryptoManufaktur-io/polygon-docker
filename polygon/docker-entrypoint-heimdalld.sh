@@ -143,6 +143,7 @@ if [[ "${DOCKER_REPO}" = *"heimdall-v2" && -f /var/lib/heimdall/setupdone && ! -
   if [ -z "${HEIMDALL_V2_GENESIS_URL}" ]; then
     HEIMDALL_V2_GENESIS_URL="https://storage.googleapis.com/${NETWORK}-heimdallv2-genesis/migrated_dump-genesis.json"
   fi
+  echo "Downloading genesis file from ${HEIMDALL_V2_GENESIS_URL}"
   curl -L -o /var/lib/heimdall/config/genesis.json "${HEIMDALL_V2_GENESIS_URL}"
   cp /var/lib/heimdall/config/genesis.json "/var/lib/heimdall/genesis-${NETWORK}-v2.json"
   cp /var/lib/heimdall/config-v1/addrbook.json /var/lib/heimdall/config/
