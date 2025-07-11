@@ -1,5 +1,0 @@
-remote_write:
-  - url: "<Your Metrics instance remote_write endpoint>"
-    basic_auth:
-      username: "your Grafana Cloud username"
-      password: "your Grafana Cloud API key"

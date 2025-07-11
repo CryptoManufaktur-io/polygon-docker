@@ -1,9 +1,9 @@
-# Polygon Docker: Docker automation for Polygon RPC nodes
+# Overview
 
-## Overview
+Meant to be used with [central-proxy-docker](https://github.com/CryptoManufaktur-io/central-proxy-docker) for traefik
+and Prometheus remote write; use `:ext-network.yml` in `COMPOSE_FILE` inside `.env` in that case.
 
-Polygon Docker follows [Eth Docker](https://eth-docker.net) conventions. A lot of the same basic patterns,
-such as for traefik access, apply.
+If you want the RPC ports exposed locally, use `bor-shared.yml` in `COMPOSE_FILE` inside `.env`.
 
 ## Getting Started
 
@@ -34,4 +34,4 @@ as well as the `HEIMDALL_REPO`, `HEIMDALL_TAG` and `BOR_REPO` and `BOR_TAG` vari
 
 # Version
 
-This is Polygon Docker v2.5.0
+This is Polygon Docker v3.0.0
