@@ -55,8 +55,11 @@ fi
 if [ ! -f /var/lib/heimdall/setupdone ]; then
   if [[ "${DOCKER_REPO}" = *"heimdall-v2" ]]; then
     heimdalld init "${BOR_NODE_ID:-upbeatCucumber}" --home /var/lib/heimdall --chain-id "${__chain_id}" --log_level info
-    # TBD whether this naming holds true for mainnet as well
-    cp "/var/lib/heimdall/genesis-${NETWORK}-v2.json" /var/lib/heimdall/config/genesis.json
+    if [ -z "${HEIMDALL_V2_GENESIS_URL}" ]; then
+      HEIMDALL_V2_GENESIS_URL="https://storage.googleapis.com/${NETWORK}-heimdallv2-genesis/migrated_dump-genesis.json"
+    fi
+    echo "Downloading genesis file from ${HEIMDALL_V2_GENESIS_URL}"
+    curl -L -o /var/lib/heimdall/config/genesis.json "${HEIMDALL_V2_GENESIS_URL}"
     touch /var/lib/heimdall/is_v2  # Do not trigger migration
   else
     heimdalld init --home /var/lib/heimdall --chain "${NETWORK}"
@@ -145,7 +148,6 @@ if [[ "${DOCKER_REPO}" = *"heimdall-v2" && -f /var/lib/heimdall/setupdone && ! -
   fi
   echo "Downloading genesis file from ${HEIMDALL_V2_GENESIS_URL}"
   curl -L -o /var/lib/heimdall/config/genesis.json "${HEIMDALL_V2_GENESIS_URL}"
-  cp /var/lib/heimdall/config/genesis.json "/var/lib/heimdall/genesis-${NETWORK}-v2.json"
   cp /var/lib/heimdall/config-v1/addrbook.json /var/lib/heimdall/config/
   touch /var/lib/heimdall/is_v2
 fi
