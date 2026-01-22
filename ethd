@@ -871,11 +871,6 @@ logs() {
 }
 
 
-check_sync() {
-  ./scripts/check_sync.sh "$@"
-}
-
-
 cmd() {
   __docompose "$@"
 }
@@ -968,8 +963,6 @@ __full_help() {
   echo "    prints the version(s) of currently running client(s)"
   echo "  logs"
   echo "    shows logs"
-  echo "  check-sync"
-  echo "    check local Bor sync status against a public RPC"
   echo "  cmd <command>"
   echo "    executes an arbitrary Docker Compose command. Use \"cmd help\" to list them"
   echo "  terminate"
@@ -1007,7 +1000,7 @@ __me="./$(basename "${BASH_SOURCE[0]}")"
 
 trap '__handle_error $? $LINENO' ERR
 
-if [[ "$#" -eq 0 || ( "$1" =~ ^-h|--help$ && "$2" != "check-sync" ) || "$*" = "update --help" || "$*" = "update -h" ]]; then
+if [[ "$#" -eq 0 || "$*" =~ "-h" ]]; then # Lazy match for -h and --help but also --histogram, so careful here
   help "$@"
   exit 0
 fi
@@ -1072,10 +1065,8 @@ if ! __docompose --help >/dev/null 2>&1; then
 fi
 
 case "$__command" in
-  help|update|up|start|down|stop|restart|version|logs|check-sync|cmd|terminate|space)
+  help|update|up|start|down|stop|restart|version|logs|cmd|terminate|space)
     $__command "$@";;
-  check-sync)
-    check_sync "$@";;
   *)
     echo "Unrecognized command $__command"
     help
