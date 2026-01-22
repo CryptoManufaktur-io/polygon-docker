@@ -1074,6 +1074,8 @@ fi
 case "$__command" in
   help|update|up|start|down|stop|restart|version|logs|check-sync|cmd|terminate|space)
     $__command "$@";;
+  check-sync)
+    check_sync "$@";;
   *)
     echo "Unrecognized command $__command"
     help
