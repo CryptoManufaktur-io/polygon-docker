@@ -636,12 +636,12 @@ if [[ $lag -gt $BLOCK_LAG ]]; then
     echo "Current lag: $current_lag blocks"
 
     if [[ $current_lag -gt $BLOCK_LAG ]]; then
-      echo "Status: SYNCING ($current_lag blocks behind, threshold: $BLOCK_LAG)"
+      echo "Status: ⏳ SYNCING ($current_lag blocks behind, threshold: $BLOCK_LAG)"
       exit 1
     fi
   else
     echo "Warning: No block advancement detected"
-    echo "Status: SYNCING (not advancing, $lag blocks behind)"
+    echo "Status: ⏳ SYNCING (not advancing, $lag blocks behind)"
     exit 1
   fi
 fi
@@ -665,7 +665,7 @@ if [[ -n "$local_hash" && -n "$public_hash" ]]; then
     echo "Local:  $local_hash"
     echo "Public: $public_hash"
     echo
-    echo "Status: DIVERGED (possible reorg or wrong network)"
+    echo "Status: ❌ DIVERGED (possible reorg or wrong network)"
     exit 2
   fi
   echo "Block hashes match at height $check_height"
@@ -673,14 +673,14 @@ fi
 
 echo
 if [[ "$sync_check_failed" -eq 1 ]]; then
-  echo "Status: UNKNOWN (eth_syncing failed; lag: $lag blocks, threshold: $BLOCK_LAG)"
+  echo "Status: ⚠️ UNKNOWN (eth_syncing failed; lag: $lag blocks, threshold: $BLOCK_LAG)"
   exit 3
 fi
 
 if [[ "$syncing" -eq 1 ]]; then
-  echo "Status: SYNCING (eth_syncing true; lag: $lag blocks, threshold: $BLOCK_LAG)"
+  echo "Status: ⏳ SYNCING (eth_syncing true; lag: $lag blocks, threshold: $BLOCK_LAG)"
   exit 1
 fi
 
-echo "Status: IN SYNC (lag: $lag blocks, threshold: $BLOCK_LAG)"
+echo "Status: ✅ IN SYNC (lag: $lag blocks, threshold: $BLOCK_LAG)"
 exit 0
