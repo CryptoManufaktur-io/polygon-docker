@@ -455,13 +455,13 @@ check_syncing() {
   fi
 
   local result
-  result=$(echo "$response" | run_cmd jq -c '
-    if .result == false then "false"
-    elif .result == true then "true"
+  result=$(echo "$response" | run_cmd jq -rc '
+    if .result == false then false
+    elif .result == true then true
     elif (.result|type) == "object" then .result
-    elif (.syncing|type) == "boolean" then (if .syncing then "true" else "false" end)
+    elif (.syncing|type) == "boolean" then .syncing
     elif (.syncing|type) == "object" then .syncing
-    elif (.result.syncing|type) == "boolean" then (if .result.syncing then "true" else "false" end)
+    elif (.result.syncing|type) == "boolean" then .result.syncing
     elif (.result.syncing|type) == "object" then .result.syncing
     else empty end
   ' 2>/dev/null)
@@ -539,14 +539,16 @@ if [[ "$sync_check_failed" -eq 1 ]]; then
 elif [[ "$sync_status" != "false" ]]; then
   syncing=1
   echo "Node is actively syncing"
-  current=$(echo "$sync_status" | run_cmd jq -r '.currentBlock // empty' 2>/dev/null)
-  highest=$(echo "$sync_status" | run_cmd jq -r '.highestBlock // empty' 2>/dev/null)
-  if [[ -n "$current" && -n "$highest" ]]; then
-    current_dec=$(printf "%d" "$current")
-    highest_dec=$(printf "%d" "$highest")
-    behind=$((highest_dec - current_dec))
-    pct=$(awk "BEGIN {printf \"%.2f\", ($current_dec / $highest_dec) * 100}")
-    echo "Progress: $current_dec / $highest_dec ($pct%) - $behind blocks behind"
+  if [[ "$sync_status" != "true" ]]; then
+    current=$(echo "$sync_status" | run_cmd jq -r '.currentBlock // empty' 2>/dev/null)
+    highest=$(echo "$sync_status" | run_cmd jq -r '.highestBlock // empty' 2>/dev/null)
+    if [[ -n "$current" && -n "$highest" ]]; then
+      current_dec=$((current))
+      highest_dec=$((highest))
+      behind=$((highest_dec - current_dec))
+      pct=$(awk "BEGIN {printf \"%.2f\", ($current_dec / $highest_dec) * 100}")
+      echo "Progress: $current_dec / $highest_dec ($pct%) - $behind blocks behind"
+    fi
   fi
 else
   echo "eth_syncing reports: not syncing"
