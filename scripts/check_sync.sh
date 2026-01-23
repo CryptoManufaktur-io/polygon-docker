@@ -530,12 +530,14 @@ fi
 echo
 
 echo "Checking eth_syncing..."
-sync_status=$(check_syncing "$LOCAL_RPC") || {
-  echo "Error: Failed to query local RPC" >&2
-  exit 3
-}
+syncing=0
+sync_check_failed=0
+sync_status=$(check_syncing "$LOCAL_RPC") || sync_check_failed=1
 
-if [[ "$sync_status" != "false" ]]; then
+if [[ "$sync_check_failed" -eq 1 ]]; then
+  echo "Warning: Failed to query eth_syncing on local RPC" >&2
+elif [[ "$sync_status" != "false" ]]; then
+  syncing=1
   echo "Node is actively syncing"
   current=$(echo "$sync_status" | run_cmd jq -r '.currentBlock // empty' 2>/dev/null)
   highest=$(echo "$sync_status" | run_cmd jq -r '.highestBlock // empty' 2>/dev/null)
@@ -546,25 +548,47 @@ if [[ "$sync_status" != "false" ]]; then
     pct=$(awk "BEGIN {printf \"%.2f\", ($current_dec / $highest_dec) * 100}")
     echo "Progress: $current_dec / $highest_dec ($pct%) - $behind blocks behind"
   fi
-  exit 1
+else
+  echo "eth_syncing reports: not syncing"
 fi
 
-echo "eth_syncing reports: not syncing"
 echo
 
 echo "Fetching block numbers..."
-local_block=$(get_block_number "$LOCAL_RPC") || {
-  echo "Error: Failed to get local block number" >&2
-  exit 3
-}
+local_err=0
+public_err=0
 
-public_block=$(get_block_number "$PUBLIC_RPC") || {
+if ! local_block=$(get_block_number "$LOCAL_RPC"); then
+  local_err=1
+  local_block=""
+fi
+
+if ! public_block=$(get_block_number "$PUBLIC_RPC"); then
+  public_err=1
+  public_block=""
+fi
+
+if [[ "$local_err" -eq 1 ]]; then
+  echo "Local block:  unavailable"
+else
+  echo "Local block:  $local_block"
+fi
+
+if [[ "$public_err" -eq 1 ]]; then
+  echo "Public block: unavailable"
+else
+  echo "Public block: $public_block"
+fi
+
+if [[ "$local_err" -eq 1 || "$public_err" -eq 1 ]]; then
+  echo "Block lag: unavailable"
+  if [[ "$local_err" -eq 1 ]]; then
+    echo "Error: Failed to get local block number" >&2
+    exit 3
+  fi
   echo "Error: Failed to get public block number" >&2
   exit 4
-}
-
-echo "Local block:  $local_block"
-echo "Public block: $public_block"
+fi
 
 lag=$((public_block - local_block))
 echo "Block lag: $lag"
@@ -646,5 +670,15 @@ if [[ -n "$local_hash" && -n "$public_hash" ]]; then
 fi
 
 echo
+if [[ "$sync_check_failed" -eq 1 ]]; then
+  echo "Status: UNKNOWN (eth_syncing failed; lag: $lag blocks, threshold: $BLOCK_LAG)"
+  exit 3
+fi
+
+if [[ "$syncing" -eq 1 ]]; then
+  echo "Status: SYNCING (eth_syncing true; lag: $lag blocks, threshold: $BLOCK_LAG)"
+  exit 1
+fi
+
 echo "Status: IN SYNC (lag: $lag blocks, threshold: $BLOCK_LAG)"
 exit 0
