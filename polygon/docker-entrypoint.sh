@@ -206,5 +206,11 @@ else
       dasel put -v "$(echo "$string")" -f /var/lib/bor/config.toml 'p2p.discovery.static-nodes.[]'
     done
   fi
+
+  # Set cache addresscachesizes for bor if provided
+  if [ -n "${BOR_ADDRESSCACHESIZES}" ]; then
+# shellcheck disable=SC2116
+      dasel put -v "${BOR_ADDRESSCACHESIZES}" -f /var/lib/bor/config.toml '.cache.addresscachesizes'
+  fi
   exec bor server --config /var/lib/bor/config.toml
 fi
