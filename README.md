@@ -20,6 +20,16 @@ Initial heimdalld peering can be challenging, see https://wiki.polygon.technolog
 
 If heimdalld cannot find peers after half an hour or so, a workaround is to take a `config/addrbook.json` from a working node, stop heimdalld, copy this file into the `config/` directory on the `heimdall-data` docker volume with the right permissions (`sudo bash` and standard cp/chown commands), and start heimdalld again.
 
+## Sync check defaults
+
+`./ethd check-sync` works without flags.
+
+- Local RPC default: `http://127.0.0.1:8545` (or `HEIMDALL_BOR_RPC_URL`, `LOCAL_RPC`, `LOCAL_RPC_URL`, `BOR_RPC_PORT` when set)
+- Public RPC default: `PUBLIC_RPC` from `.env`, falling back to `https://polygon-rpc.com`
+- Lag threshold default: `BLOCK_LAG=2`
+
+Override as needed with `--local-rpc`, `--public-rpc`, `--block-lag`, `--compose-service`, `--container`, or `--env-file`.
+
 ## Database format, pruning
 
 Bor will use whatever format an existing DB is in, or fresh-sync with Pebble/PBSS. For legacy leveldb/hash DBs,
