@@ -32,7 +32,7 @@ Bor public RPC default: `PUBLIC_RPC` from `.env`, falling back to `https://polyg
 Bor lag threshold default: `BLOCK_LAG=2`.
 
 Heimdall local RPC default: `HEIMDALL_LOCAL_RPC` if set, otherwise `http://127.0.0.1:${HEIMDALL_RPC_PORT:-26657}`.
-Heimdall public RPC default: `HEIMDALL_PUBLIC_RPC` from `.env` if set, else `https://heimdall-api.polygon.technology` for `NETWORK=mainnet`, else `https://heimdall-api-amoy.polygon.technology` for `NETWORK=amoy`. If `NETWORK` is not `mainnet` or `amoy`, set `HEIMDALL_PUBLIC_RPC` explicitly.
+Heimdall public RPC default: `HEIMDALL_PUBLIC_RPC` from `.env` if set, else `https://polygon-heimdall-rpc.publicnode.com` for `NETWORK=mainnet` (default), else `https://polygon-amoy-heimdall-rpc.publicnode.com` for `NETWORK=amoy`. If `NETWORK` is not `mainnet` or `amoy`, set `HEIMDALL_PUBLIC_RPC` explicitly.
 Heimdall lag threshold default: `HEIMDALL_BLOCK_LAG=2`.
 
 Override precedence: CLI flags > environment variables > `--env-file`/`.env` values > built-in defaults.

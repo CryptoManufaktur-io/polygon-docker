@@ -164,7 +164,7 @@ load_env_file() {
 }
 
 resolve_network() {
-  printf '%s' "$ENV_NETWORK"
+  resolve_with_default "mainnet" "$ENV_NETWORK"
 }
 
 resolve_public_rpc() {
@@ -232,10 +232,10 @@ resolve_heimdall_public_rpc() {
 
   case "$network" in
     mainnet)
-      printf '%s' 'https://heimdall-api.polygon.technology'
+      printf '%s' 'https://polygon-heimdall-rpc.publicnode.com'
       ;;
     amoy)
-      printf '%s' 'https://heimdall-api-amoy.polygon.technology'
+      printf '%s' 'https://polygon-amoy-heimdall-rpc.publicnode.com'
       ;;
     *)
       printf '%s' ''
