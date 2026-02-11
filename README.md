@@ -20,6 +20,24 @@ Initial heimdalld peering can be challenging, see https://wiki.polygon.technolog
 
 If heimdalld cannot find peers after half an hour or so, a workaround is to take a `config/addrbook.json` from a working node, stop heimdalld, copy this file into the `config/` directory on the `heimdall-data` docker volume with the right permissions (`sudo bash` and standard cp/chown commands), and start heimdalld again.
 
+## Sync check defaults
+
+`./ethd check-sync` works without flags.
+
+`./ethd check-sync` always runs inside the `heimdalld` compose service (the wrapper ignores `--compose-service` and `--container`). To target a different container, run `scripts/check_sync.sh` directly.
+
+Bor local RPC default (container mode): `LOCAL_RPC`, `LOCAL_RPC_URL`, `HEIMDALL_BOR_RPC_URL`, then `BOR_RPC_PORT`, then `http://127.0.0.1:8545`.
+Bor local RPC default (host mode): `LOCAL_RPC`, `LOCAL_RPC_URL`, `BOR_RPC_PORT`, `HEIMDALL_BOR_RPC_URL`, then `http://127.0.0.1:8545`.
+Bor public RPC default: `PUBLIC_RPC` from `.env`, falling back to `https://polygon-rpc.com`.
+Bor lag threshold default: `BLOCK_LAG=2`.
+
+Heimdall local RPC default: `HEIMDALL_LOCAL_RPC` if set, otherwise `http://127.0.0.1:${HEIMDALL_RPC_PORT:-26657}`.
+Heimdall public RPC default: `HEIMDALL_PUBLIC_RPC` from `.env` if set, else `https://polygon-heimdall-rpc.publicnode.com` for `NETWORK=mainnet` (default), else `https://polygon-amoy-heimdall-rpc.publicnode.com` for `NETWORK=amoy`. If `NETWORK` is not `mainnet` or `amoy`, set `HEIMDALL_PUBLIC_RPC` explicitly.
+Heimdall lag threshold default: `HEIMDALL_BLOCK_LAG=2`.
+
+Override precedence: CLI flags > environment variables > `--env-file`/`.env` values > built-in defaults.
+Overrides: `--local-rpc`, `--public-rpc`, `--block-lag`, `--heimdall-local-rpc`, `--heimdall-public-rpc`, `--heimdall-block-lag`, `--compose-service`, `--container`, `--env-file`.
+
 ## Database format, pruning
 
 Bor will use whatever format an existing DB is in, or fresh-sync with Pebble/PBSS. For legacy leveldb/hash DBs,

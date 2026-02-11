@@ -4,3 +4,4 @@
 *.original
 custom.yml
 prometheus/custom-prom.yml
+.agent/*
