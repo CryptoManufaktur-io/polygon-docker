@@ -24,11 +24,20 @@ If heimdalld cannot find peers after half an hour or so, a workaround is to take
 
 `./ethd check-sync` works without flags.
 
-- Local RPC default: `http://127.0.0.1:8545` (or `HEIMDALL_BOR_RPC_URL`, `LOCAL_RPC`, `LOCAL_RPC_URL`, `BOR_RPC_PORT` when set)
-- Public RPC default: `PUBLIC_RPC` from `.env`, falling back to `https://polygon-rpc.com`
-- Lag threshold default: `BLOCK_LAG=2`
+- Bor local RPC default: `http://127.0.0.1:8545` (or `HEIMDALL_BOR_RPC_URL`, `LOCAL_RPC`, `LOCAL_RPC_URL`, `BOR_RPC_PORT` when set)
+- Bor public RPC default: `PUBLIC_RPC` from `.env`, falling back to `https://polygon-rpc.com`
+- Bor lag threshold default: `BLOCK_LAG=2`
+- Heimdall local RPC default: `HEIMDALL_LOCAL_RPC` if set, otherwise `http://127.0.0.1:${HEIMDALL_RPC_PORT:-26657}`
+- Heimdall public RPC default:
+  - `HEIMDALL_PUBLIC_RPC` from `.env` if set
+  - else `https://heimdall-api.polygon.technology` for `NETWORK=mainnet`
+  - else `https://heimdall-api-amoy.polygon.technology` for `NETWORK=amoy`
+- Heimdall lag threshold default: `HEIMDALL_BLOCK_LAG=2`
 
-Override as needed with `--local-rpc`, `--public-rpc`, `--block-lag`, `--compose-service`, `--container`, or `--env-file`.
+If `NETWORK` is not `mainnet` or `amoy`, set `HEIMDALL_PUBLIC_RPC` explicitly.
+
+Override precedence is: CLI flags > environment variables > `--env-file`/`.env` values > built-in defaults.
+Available sync-check overrides include `--local-rpc`, `--public-rpc`, `--block-lag`, `--heimdall-local-rpc`, `--heimdall-public-rpc`, `--heimdall-block-lag`, `--compose-service`, `--container`, and `--env-file`.
 
 ## Database format, pruning
 
