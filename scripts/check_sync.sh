@@ -398,7 +398,7 @@ heimdall_status_height_catching_up() {
         empty
       else
         ($height|tostring) + " " + (
-          if ($catching == true or ($catching|ascii_downcase) == "true") then "true" else "false" end
+          if ($catching == true or ($catching|tostring|ascii_downcase) == "true") then "true" else "false" end
         )
       end
   ' 2>/dev/null)" || return 1
