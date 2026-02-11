@@ -176,17 +176,28 @@ resolve_public_rpc() {
 
 resolve_local_rpc() {
   local resolved_rpc
-  resolved_rpc="$(first_non_empty \
-    "$CLI_LOCAL_RPC" \
-    "$ENV_LOCAL_RPC" \
-    "$ENV_LOCAL_RPC_URL" \
-    "$ENV_HEIMDALL_BOR_RPC_URL")"
+  if [[ -n "$CONTAINER" || -n "$COMPOSE_SERVICE" ]]; then
+    resolved_rpc="$(first_non_empty \
+      "$CLI_LOCAL_RPC" \
+      "$ENV_LOCAL_RPC" \
+      "$ENV_LOCAL_RPC_URL" \
+      "$ENV_HEIMDALL_BOR_RPC_URL")"
+  else
+    resolved_rpc="$(first_non_empty \
+      "$CLI_LOCAL_RPC" \
+      "$ENV_LOCAL_RPC" \
+      "$ENV_LOCAL_RPC_URL")"
+  fi
   if [[ -n "$resolved_rpc" ]]; then
     printf '%s' "$resolved_rpc"
     return
   fi
   if [[ -n "$ENV_BOR_RPC_PORT" ]]; then
     printf 'http://127.0.0.1:%s' "$ENV_BOR_RPC_PORT"
+    return
+  fi
+  if [[ -n "$ENV_HEIMDALL_BOR_RPC_URL" ]]; then
+    printf '%s' "$ENV_HEIMDALL_BOR_RPC_URL"
     return
   fi
   printf '%s' "$LOCAL_RPC_DEFAULT"

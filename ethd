@@ -1072,7 +1072,7 @@ case "$__command" in
   check-sync)
     trap - ERR
     set +e
-    ./scripts/check_sync.sh "$@"
+    ./scripts/check_sync.sh --compose-service heimdalld "$@"
     exit "$?"
     ;;
   *)
