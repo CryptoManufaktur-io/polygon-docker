@@ -390,9 +390,13 @@ heimdall_status_height_catching_up() {
       empty
     ) as $height
     | (
-      .result.sync_info.catching_up //
-      .sync_info.catching_up //
-      empty
+      if (.result.sync_info.catching_up? | type) != "null" then
+        .result.sync_info.catching_up
+      elif (.sync_info.catching_up? | type) != "null" then
+        .sync_info.catching_up
+      else
+        empty
+      end
     ) as $catching
     | if ($height == "" or $catching == "") then
         empty
