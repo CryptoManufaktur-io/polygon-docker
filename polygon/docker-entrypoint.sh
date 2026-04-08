@@ -212,5 +212,5 @@ else
 # shellcheck disable=SC2116
       dasel put -v "${BOR_ADDRESSCACHESIZES}" -f /var/lib/bor/config.toml '.cache.addresscachesizes'
   fi
-  exec bor server --config /var/lib/bor/config.toml
+  exec bor server --config /var/lib/bor/config.toml "$@"
 fi
