@@ -163,6 +163,8 @@ fi
 dasel put -v "tcp://0.0.0.0:${HEIMDALL_RPC_PORT}" -f /var/lib/heimdall/config/config.toml 'rpc.laddr'
 dasel put -v "tcp://${SERVER_IP}:${HEIMDALL_P2P_PORT}" -f /var/lib/heimdall/config/config.toml 'p2p.external_address'
 dasel put -v "tcp://0.0.0.0:${HEIMDALL_P2P_PORT}" -f /var/lib/heimdall/config/config.toml 'p2p.laddr'
+# Applies to both heimdall v1 and heimdall-v2 (cometbft listens on :26660 when enabled)
+dasel put -v "${ENABLE_PROMETHEUS_METRICS:-false}" -f /var/lib/heimdall/config/config.toml 'instrumentation.prometheus'
 if [[ "${DOCKER_REPO}" = *"heimdall-v2"* ]]; then
   dasel put -v "${HEIMDALL_BOR_RPC_URL}" -f /var/lib/heimdall/config/app.toml 'custom.bor_rpc_url'
   dasel put -v "${HEIMDALL_ETH_RPC_URL}" -f /var/lib/heimdall/config/app.toml 'custom.eth_rpc_url'
@@ -174,7 +176,6 @@ if [[ "${DOCKER_REPO}" = *"heimdall-v2"* ]]; then
 else
   dasel put -v "main:${LOG_LEVEL},state:${LOG_LEVEL},*:error" -f /var/lib/heimdall/config/config.toml 'log_level'
   dasel put -v "${BOR_NODE_ID:-upbeatCucumber}" -f /var/lib/heimdall/config/config.toml 'moniker'
-  dasel put -v "${ENABLE_PROMETHEUS_METRICS:-false}" -f /var/lib/heimdall/config/config.toml 'instrumentation.prometheus'
   dasel put -v "300" -f /var/lib/heimdall/config/config.toml 'p2p.max_num_inbound_peers'
   dasel put -v "100" -f /var/lib/heimdall/config/config.toml 'p2p.max_num_outbound_peers'
   dasel put -v "http://0.0.0.0:${HEIMDALL_RPC_PORT}" -f /var/lib/heimdall/config/heimdall-config.toml 'tendermint_rpc_url'
